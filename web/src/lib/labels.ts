@@ -36,3 +36,11 @@ export const COLORS = {
 };
 
 export const EXPENSE_CATEGORIES = ['Pessoal', 'Estrutura', 'Impostos', 'Software', 'Marketing', 'Fornecedores', 'Operacional', 'Outros'];
+
+// Conta pessoal
+export const PERSONAL_EXPENSE_CATEGORIES = ['Moradia', 'Pensão', 'Alimentação', 'Saúde', 'Educação', 'Transporte', 'Lazer', 'Assinaturas', 'Impostos', 'Outros'];
+export const DEBT_STATUS: Record<'QUITADA' | 'EM_DIA' | 'ATRASADA', { label: string; tone: 'success' | 'info' | 'danger' }> = {
+  QUITADA: { label: 'Quitada', tone: 'success' },
+  EM_DIA: { label: 'Em dia', tone: 'info' },
+  ATRASADA: { label: 'Parcela atrasada', tone: 'danger' },
+};
