@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html,
+  body {
+    @apply bg-bg text-ink-body font-sans antialiased;
+    font-size: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    min-height: 100dvh;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-ink-title font-semibold;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+  /* Ícone do seletor de data visível no tema escuro */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='month']::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: none;
+  }
+  ::selection {
+    background: rgba(56, 189, 248, 0.35);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1f2e54 transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-line bg-surface shadow-card;
+  }
+  /* Rótulos de apoio: Montserrat Italic (diretriz do design) */
+  .label {
+    @apply text-[12.5px] italic text-ink-muted;
+  }
+  .kpi-value {
+    @apply font-bold text-ink tabular-nums tracking-tight;
+  }
+  .section-title {
+    @apply text-[18px] font-semibold text-ink-title;
+  }
+  .focus-ring {
+    @apply focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  }
+  .tap {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  .skeleton {
+    @apply animate-skeleton rounded-md bg-elevated;
+  }
+  .scroll-x {
+    @apply flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: calc(var(--safe-bottom) + 0.5rem);
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-area,
+  .print-area * {
+    color: #111 !important;
+    background: transparent !important;
+    border-color: #ccc !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "finplan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Planejamento financeiro, previsibilidade comercial e fluxo de caixa",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w web",
+    "build": "npm run build -w server && npm run build -w web",
+    "start": "npm run start -w server",
+    "start:prod": "npm run start:prod -w server",
+    "test": "npm run test -w server && npm run test -w web",
+    "lint": "npm run lint -w server && npm run lint -w web",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:migrate:deploy": "npm run db:migrate:deploy -w server",
+    "db:seed": "npm run db:seed -w server",
+    "db:generate": "npm run db:generate -w server"
+  }
+}

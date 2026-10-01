@@ -1,0 +1,45 @@
+# Blueprint do Render: 1 Web Service (API + frontend) + 1 PostgreSQL gerenciado.
+# Render → New → Blueprint → selecione este repositório.
+databases:
+  - name: finplan-db
+    plan: free            # troque para basic-256mb (ou maior) em produção real — o plano free expira
+    databaseName: finplan
+    user: finplan
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: finplan
+    runtime: node
+    plan: free            # starter recomendado para não "dormir"
+    region: oregon
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: finplan-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: auto
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN_HOURS
+        value: "12"
+      - key: APP_TIMEZONE
+        value: America/Sao_Paulo
+      - key: INITIAL_ADMIN_USERNAME
+        value: mlf
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false       # o Render pede o valor ao criar o Blueprint (use 0080 e troque no 1º acesso)
+      - key: SEED_DEMO
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
