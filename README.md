@@ -172,7 +172,7 @@ npm run dev                          # API :3000 e front :5173
 
 ## 8. GitHub e Render
 
-> **Atualizando a partir da versão anterior (FinPlan)?** No primeiro start, o sistema detecta as tabelas antigas e as **move** para o schema `legacy_v1` (backup: nada é apagado). Depois cria a estrutura nova e mantém o usuário e a senha atuais. Não é preciso mexer no banco.
+> **Banco compartilhado:** todas as tabelas deste sistema ficam no schema `dashboard_financeiro` (variável `DATABASE_SCHEMA`), inclusive o controle de migrations. Por isso dá para usar um PostgreSQL que já atende outro sistema (o plano free do Render só permite 1 banco) sem tocar nas tabelas dele. Se o banco tiver a versão anterior (FinPlan) no schema `public`, os usuários são importados com a mesma senha e o restante fica intocado.
 
 ```bash
 git remote add origin https://github.com/<usuario>/dashboard-financeiro.git
@@ -180,19 +180,21 @@ git push -u origin main
 ```
 O `.gitignore` exclui `node_modules`, `dist` e todos os `.env`. O CI roda lint, typecheck, testes (Postgres 16) e build.
 
-**Render (Blueprint):**
-1. **New → Blueprint** e conecte o repositório. O `render.yaml` cria o PostgreSQL e o Web Service, com build `npm ci --include=dev && npm run build`, start `npm run start:prod` e health check `/api/health`.
-2. Quando o Render pedir, informe `INITIAL_ADMIN_PASSWORD` = `0080`. O `JWT_SECRET` é gerado automaticamente.
-3. Clique em **Apply**, acesse a URL, entre com `mlf`/`0080` e troque a senha.
-4. *(Opcional)* `SEED_DEMO=true` cria a demonstração se o banco estiver vazio. Volte para `false` antes de lançar dados reais.
+**Render (Blueprint, usando um banco já existente):**
+1. No banco que você já tem: **Connections → External Database URL** → copiar.
+2. **New → Blueprint** e conecte o repositório. O `render.yaml` cria só o Web Service, com build `npm ci --include=dev && npm run build`, start `npm run start:prod` e health check `/api/health`.
+3. Quando o Render pedir, informe `DATABASE_URL` (a URL copiada) e `INITIAL_ADMIN_PASSWORD` = `0080`. O `JWT_SECRET` é gerado automaticamente.
+4. Clique em **Apply**, acesse a URL, entre com `mlf`/`0080` e troque a senha.
+5. *(Opcional)* `SEED_DEMO=true` cria a demonstração se o sistema estiver vazio. Volte para `false` antes de lançar dados reais.
 
-Para configurar manualmente: crie o PostgreSQL e um Web Service Node com os mesmos comandos e as variáveis `NODE_ENV=production`, `DATABASE_URL` (Internal URL), `JWT_SECRET`, `INITIAL_ADMIN_USERNAME=mlf`, `INITIAL_ADMIN_PASSWORD=0080`, `APP_TIMEZONE=America/Sao_Paulo` e `NODE_VERSION=22`. Lembre que o plano free do Render hiberna e o Postgres free expira; para uso real, use planos pagos com backup.
+Se o serviço e o banco estiverem na **mesma região**, a *Internal Database URL* também funciona e dispensa SSL; a *External* funciona de qualquer região (SSL automático). O plano free hiberna e o Postgres free expira; para uso real, use planos pagos com backup.
 
 ### Variáveis de ambiente
 | Variável | Obrigatória | Padrão | Descrição |
 |---|---|---|---|
 | `NODE_ENV` | sim (prod) | `development` | `production` ativa cookie Secure e CSP |
 | `DATABASE_URL` | **sim** | — | conexão PostgreSQL |
+| `DATABASE_SCHEMA` | não | `dashboard_financeiro` | schema próprio no banco (permite compartilhar o banco) |
 | `DATABASE_SSL` | não | `auto` | `auto` \| `require` \| `disable` |
 | `JWT_SECRET` | **sim** | — | ≥ 32 caracteres |
 | `JWT_EXPIRES_IN_HOURS` | não | `12` | duração da sessão |

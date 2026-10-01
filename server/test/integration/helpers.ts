@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import request from 'supertest';
 import { createApp } from '../../src/app';
+import { config } from '../../src/config';
 import { db } from '../../src/db/client';
 import { runMigrations } from '../../src/db/migrate';
 import { ensureInitialAdmin } from '../../src/services/auth';
@@ -11,9 +12,7 @@ process.env.FINPLAN_FAKE_TODAY = TODAY;
 export const app = createApp();
 
 export async function resetDatabase() {
-  await db.execute(sql`drop schema if exists public cascade`);
-  await db.execute(sql`drop schema if exists drizzle cascade`);
-  await db.execute(sql`create schema public`);
+  await db.execute(sql.raw(`drop schema if exists ${config.DATABASE_SCHEMA} cascade`));
   await runMigrations();
   await ensureInitialAdmin();
 }

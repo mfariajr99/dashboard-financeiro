@@ -19,6 +19,8 @@ function sslOption(): pg.PoolConfig['ssl'] {
 export const pool = new pg.Pool({
   connectionString: config.DATABASE_URL,
   ssl: sslOption(),
+  // Todas as consultas (e as migrations) usam o schema próprio do sistema.
+  options: `-c search_path=${config.DATABASE_SCHEMA}`,
   max: 10,
   idleTimeoutMillis: 30_000,
 });

@@ -1,7 +1,7 @@
-CREATE TYPE "public"."expense_status" AS ENUM('PENDENTE', 'PAGA');--> statement-breakpoint
-CREATE TYPE "public"."opportunity_status" AS ENUM('ABERTA', 'VENDA_EFETUADA', 'DECLINOU');--> statement-breakpoint
-CREATE TYPE "public"."payment_method" AS ENUM('PIX', 'BOLETO', 'CARTAO');--> statement-breakpoint
-CREATE TYPE "public"."receivable_status" AS ENUM('A_RECEBER', 'RECEBIDO');--> statement-breakpoint
+CREATE TYPE "expense_status" AS ENUM('PENDENTE', 'PAGA');--> statement-breakpoint
+CREATE TYPE "opportunity_status" AS ENUM('ABERTA', 'VENDA_EFETUADA', 'DECLINOU');--> statement-breakpoint
+CREATE TYPE "payment_method" AS ENUM('PIX', 'BOLETO', 'CARTAO');--> statement-breakpoint
+CREATE TYPE "receivable_status" AS ENUM('A_RECEBER', 'RECEBIDO');--> statement-breakpoint
 CREATE TABLE "app_settings" (
 	"key" text PRIMARY KEY NOT NULL,
 	"value" jsonb NOT NULL,
@@ -111,7 +111,7 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_username_unique" UNIQUE("username")
 );
 --> statement-breakpoint
-ALTER TABLE "receivables" ADD CONSTRAINT "receivables_sale_id_sales_id_fk" FOREIGN KEY ("sale_id") REFERENCES "public"."sales"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "receivables" ADD CONSTRAINT "receivables_sale_id_sales_id_fk" FOREIGN KEY ("sale_id") REFERENCES "sales"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "audit_created_idx" ON "audit_logs" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "expenses_due_idx" ON "expenses" USING btree ("due_date");--> statement-breakpoint
 CREATE INDEX "expenses_series_idx" ON "expenses" USING btree ("series_id");--> statement-breakpoint

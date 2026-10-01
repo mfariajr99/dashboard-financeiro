@@ -1,16 +1,10 @@
-# Blueprint do Render: 1 Web Service (API + frontend) + 1 PostgreSQL gerenciado.
-# Render → New → Blueprint → selecione este repositório.
-databases:
-  - name: finplan-db
-    plan: free            # troque para basic-256mb (ou maior) em produção real — o plano free expira
-    databaseName: finplan
-    user: finplan
-    region: oregon
-    postgresMajorVersion: "16"
-
+# Blueprint do Render: 1 Web Service (API + frontend) que usa um PostgreSQL JÁ EXISTENTE.
+# (No plano gratuito o Render só permite 1 banco; este sistema fica isolado no schema
+#  "dashboard_financeiro", sem tocar nas tabelas de outros sistemas do mesmo banco.)
+# Render → New → Blueprint → selecione este repositório → informe DATABASE_URL e a senha inicial.
 services:
   - type: web
-    name: finplan
+    name: dashboard-financeiro
     runtime: node
     plan: free            # starter recomendado para não "dormir"
     region: oregon
@@ -24,9 +18,9 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: DATABASE_URL
-        fromDatabase:
-          name: finplan-db
-          property: connectionString
+        sync: false       # cole a "Internal Database URL" do banco que você já tem no Render
+      - key: DATABASE_SCHEMA
+        value: dashboard_financeiro
       - key: DATABASE_SSL
         value: auto
       - key: JWT_SECRET

@@ -7,6 +7,14 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatória'),
   /** SSL para o Postgres: "require" (Render externo), "disable" (local/rede interna). */
   DATABASE_SSL: z.enum(['require', 'disable', 'auto']).default('auto'),
+  /**
+   * Schema do Postgres onde ficam as tabelas deste sistema. Permite compartilhar um banco já
+   * existente (ex.: Render free, que só permite 1 banco) sem misturar com tabelas de outro app.
+   */
+  DATABASE_SCHEMA: z
+    .string()
+    .regex(/^[a-z_][a-z0-9_]{0,62}$/, 'DATABASE_SCHEMA: use só letras minúsculas, números e _')
+    .default('dashboard_financeiro'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET precisa ter ao menos 32 caracteres'),
   JWT_EXPIRES_IN_HOURS: z.coerce.number().positive().default(12),
   APP_TIMEZONE: z.string().default('America/Sao_Paulo'),
