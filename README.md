@@ -27,21 +27,6 @@ Stack: React + TypeScript (front), Node + TypeScript (API) e PostgreSQL. O login
 
 O botão **+** (canto inferior no celular, topo no desktop) cria oportunidade, venda, receita ou despesa de qualquer tela.
 
-### Conta Pessoal (separada da empresa)
-Área própria no menu para as finanças pessoais. Usa tabelas próprias (`personal_*`, `debt_installments`) e **não entra** em nenhum número do dashboard da empresa.
-
-| Tela | O que faz |
-|---|---|
-| **Visão geral** | Para o mês escolhido: valor da retirada (editável, com opção de repetir até dezembro), total de despesas, despesas já pagas, total de dívidas (parcelas do mês), dívidas quitadas e **saving** (R$ e % da retirada). Abaixo, a tabela jan–dez com os mesmos campos e o total do ano. |
-| **Despesas do mês** | Cadastro, consulta e edição. **Única** ou **recorrente** (ex.: Pensão todo dia 09, do mês de início ao de fim). Marcar como paga. Na edição de uma recorrente: *Só esta* ou *Esta e as próximas*. |
-| **Dívidas** | Cadastro com credor, valor total, nº de parcelas, dia do vencimento, mês da 1ª parcela e parcelas já pagas (para dívidas em andamento). Mostra saldo devedor, atraso, progresso e as parcelas do mês com botão de pagar. Editar o valor ou o plano mantém as parcelas pagas e redistribui o restante. |
-
-```
-Saving do mês = retirada − despesas do mês − parcelas de dívidas do mês
-% saving      = saving ÷ retirada
-Saldo devedor = soma das parcelas de dívidas ainda não pagas
-```
-
 ## 2. Fluxo principal: do funil ao faturamento
 
 ```
