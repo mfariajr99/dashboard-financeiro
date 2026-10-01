@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { annualComparison, installmentPlan, monthDashboard, monthDays, receivableSituation } from '../../src/core/calc';
+import { annualComparison, installmentPlan, monthDashboard, monthDays, receivableSituation, recurrenceFromDates, recurringDates } from '../../src/core/calc';
 import { businessDaysBetween, easterSunday, isBusinessDay } from '../../src/core/dates';
 import { MemoryRepo } from '../../src/core/memoryRepo';
 import { loadData, expenses, goals, opportunities, receivables, sales } from '../../src/core/services';
@@ -117,6 +117,37 @@ describe('fluxo funil → venda → faturamento', () => {
     await receivables.receive(repo, r.id, {}, TODAY);
     await expect(sales.update(repo, sale.id, { client: 'E', grossAmount: 2000, saleDate: '2026-09-01', paymentMethod: 'PIX', installments: 3, firstDate: '2026-09-01' })).rejects.toMatchObject({ status: 409 });
     void recs;
+  });
+
+  it('boleto recorrente: dia fixo do mês de início ao fim, já programado no faturamento', async () => {
+    const dates = recurringDates(31, '2026-11', '2027-03');
+    expect(dates).toEqual(['2026-11-30', '2026-12-31', '2027-01-31', '2027-02-28', '2027-03-31']);
+    expect(recurrenceFromDates(dates)).toEqual({ day: 31, startMonth: '2026-11', endMonth: '2027-03' });
+    expect(recurringDates(10, '2026-12', '2026-11')).toEqual([]);
+
+    // 5 boletos de R$ 2.000 → venda total R$ 10.000 (entra na meta de setembro)
+    const body = { client: 'Contrato', grossAmount: 10000, saleDate: '2026-09-10', paymentMethod: 'BOLETO', installments: 5, firstDate: dates[0], dates };
+    const { sale, receivables: recs } = await sales.create(repo, ctx, body);
+    expect(recs.map((r) => [r.dueDate, r.netAmount])).toEqual(dates.map((d) => [d, '2000.00']));
+    expect(monthDashboard(await loadData(repo), '2026-09', TODAY).sales.sold).toBe(1_000_000);
+    expect(monthDashboard(await loadData(repo), '2027-02', TODAY).billing.total).toBe(200_000);
+
+    // só a observação muda → nada é refeito, mesmo com boleto recebido
+    await receivables.receive(repo, recs[0].id, {}, TODAY);
+    await sales.update(repo, sale.id, { ...body, notes: 'contrato anual' });
+    expect((await repo.receivables.get(recs[0].id))?.status).toBe('RECEBIDO');
+
+    // prorrogar até jun/2027: o boleto recebido é mantido e os novos meses entram
+    const longer = recurringDates(31, '2026-11', '2027-06');
+    await sales.update(repo, sale.id, { ...body, grossAmount: 16000, installments: 8, dates: longer, firstDate: longer[0] });
+    const after = (await repo.receivables.all()).filter((r) => r.saleId === sale.id).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    expect(after).toHaveLength(8);
+    expect(after[0]).toMatchObject({ id: recs[0].id, status: 'RECEBIDO', installmentNumber: 1, installmentCount: 8 });
+    expect(after.at(-1)).toMatchObject({ dueDate: '2027-06-30', netAmount: '2000.00', status: 'A_RECEBER' });
+
+    // começar depois do boleto já recebido não é permitido (perderia o recebimento)
+    const later = recurringDates(31, '2026-12', '2027-06');
+    await expect(sales.update(repo, sale.id, { ...body, grossAmount: 14000, installments: 7, dates: later, firstDate: later[0] })).rejects.toMatchObject({ status: 409 });
   });
 
   it('comparativo anual: meta × venda, crescimento m/m e acumulado', async () => {

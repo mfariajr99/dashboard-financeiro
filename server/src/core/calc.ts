@@ -51,6 +51,30 @@ export function installmentPlan(p: { gross: Cents; method: PaymentMethod; cardRa
   }));
 }
 
+/** Quantos meses entre início e fim (inclusive). 0 se o fim for antes do início. */
+export function monthsInclusive(startMonth: MonthKey, endMonth: MonthKey): number {
+  const [ys, ms] = startMonth.split('-').map(Number);
+  const [ye, me] = endMonth.split('-').map(Number);
+  return Math.max(0, (ye - ys) * 12 + (me - ms) + 1);
+}
+
+/**
+ * Cobrança recorrente (boleto): vencimento no dia `day` de cada mês, do mês de início ao de fim.
+ * Em meses mais curtos o dia é ajustado para o último dia do mês (ex.: 31 → 28/02).
+ */
+export function recurringDates(day: number, startMonth: MonthKey, endMonth: MonthKey): ISODate[] {
+  const n = Math.min(60, monthsInclusive(startMonth, endMonth));
+  const d = Math.min(31, Math.max(1, Math.floor(day || 1)));
+  return Array.from({ length: n }, (_, i) => addMonthsClamped(`${startMonth}-01`, i, d));
+}
+
+/** Reconstrói os dados de uma cobrança recorrente a partir das parcelas já gravadas (para edição). */
+export function recurrenceFromDates(dates: ISODate[]): { day: number; startMonth: MonthKey; endMonth: MonthKey } | null {
+  if (dates.length === 0) return null;
+  const sorted = [...dates].sort();
+  return { day: Math.max(...sorted.map((d) => Number(d.slice(8, 10)))), startMonth: monthOf(sorted[0]), endMonth: monthOf(sorted[sorted.length - 1]) };
+}
+
 // ------------------------------------------------------------------ dias úteis
 export interface MonthDays {
   businessDaysTotal: number;

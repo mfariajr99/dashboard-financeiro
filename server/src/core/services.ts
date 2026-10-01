@@ -256,13 +256,24 @@ export const sales = {
       const cur = await tx.sales.get(id);
       if (!cur) throw notFound('Venda não encontrada');
       const v = parse(saleSchema, input);
-      const mine = (await tx.receivables.all()).filter((r) => r.saleId === id);
-      const planChanged =
-        v.grossAmount !== cur.grossAmount || v.paymentMethod !== cur.paymentMethod || v.installments !== cur.installments || !!v.dates?.length || v.firstDate !== mine.sort((a, b) => a.installmentNumber - b.installmentNumber)[0]?.dueDate;
-      if (planChanged && mine.some((r) => r.status === 'RECEBIDO'))
-        throw conflict('Já há parcelas recebidas: para mudar valor, forma ou parcelas, desmarque os recebimentos primeiro. Datas e observações podem ser alteradas em cada receita.');
+      const mine = (await tx.receivables.all()).filter((r) => r.saleId === id).sort((x, y) => x.installmentNumber - y.installmentNumber);
       // Cartão mantém a taxa histórica da venda; se a venda passou a ser no cartão, usa a taxa vigente.
       const feeRate = v.paymentMethod === 'CARTAO' ? (cur.paymentMethod === 'CARTAO' ? Number(cur.feeRate) : await cardRate(tx)) : 0;
+      const plan = planFrom(v, feeRate);
+      const sameDates = plan.length === mine.length && plan.every((p, i) => p.dueDate === mine[i].dueDate);
+      const planChanged = v.grossAmount !== cur.grossAmount || v.paymentMethod !== cur.paymentMethod || v.installments !== cur.installments || !sameDates;
+      // Parcelas já recebidas são preservadas: precisam continuar existindo no novo plano (mesma data e valor).
+      const received = mine.filter((r) => r.status === 'RECEBIDO');
+      const keep = new Map<number, Receivable>(); // índice no plano → parcela recebida mantida
+      if (planChanged)
+        for (const r of received) {
+          const idx = plan.findIndex((p, i) => !keep.has(i) && p.dueDate === r.dueDate && p.net === toCents(r.netAmount) && v.paymentMethod === r.paymentMethod);
+          if (idx < 0)
+            throw conflict(
+              `A parcela de ${r.dueDate.split('-').reverse().join('/')} já foi recebida e não existe no novo plano. Mantenha as parcelas recebidas (mesma data e valor) ou desmarque o recebimento primeiro.`,
+            );
+          keep.set(idx, r);
+        }
       const { feeCents, netCents } = computeFee(toCents(v.grossAmount), feeRate);
       const sale = await tx.sales.update(id, {
         client: v.client,
@@ -278,15 +289,21 @@ export const sales = {
         notes: v.notes,
       });
       if (planChanged) {
-        for (const r of mine) await tx.receivables.remove(r.id);
-        for (const p of planFrom(v, feeRate))
+        const kept = new Set([...keep.values()].map((r) => r.id));
+        for (const r of mine) if (!kept.has(r.id)) await tx.receivables.remove(r.id);
+        for (const [i, p] of plan.entries()) {
+          const k = keep.get(i);
+          if (k) {
+            await tx.receivables.update(k.id, { client: v.client, description: v.description, installmentNumber: p.number, installmentCount: plan.length });
+            continue;
+          }
           await tx.receivables.insert({
             saleId: id,
             client: v.client,
             description: v.description,
             paymentMethod: v.paymentMethod,
             installmentNumber: p.number,
-            installmentCount: v.installments,
+            installmentCount: plan.length,
             grossAmount: centsToDecimalString(p.gross),
             feeAmount: centsToDecimalString(p.fee),
             netAmount: centsToDecimalString(p.net),
@@ -295,6 +312,7 @@ export const sales = {
             receivedDate: null,
             notes: null,
           });
+        }
       } else for (const r of mine) await tx.receivables.update(r.id, { client: v.client, description: v.description });
       if (cur.opportunityId) await tx.opportunities.update(cur.opportunityId, { client: v.client, grossAmount: v.grossAmount });
       await tx.audit('UPDATE', 'sale', id);

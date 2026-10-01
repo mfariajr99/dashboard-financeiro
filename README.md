@@ -40,13 +40,16 @@ Ao clicar em **Venda efetuada**, o sistema pergunta como será pago:
 
 | Forma | Desconto | Programação |
 |---|---|---|
-| **Pix / Boleto** | nenhum (líquido = bruto) | x parcelas com datas mensais a partir da 1ª data (cada data pode ser editada) |
+| **Pix** | nenhum (líquido = bruto) | x parcelas com datas mensais a partir da 1ª data (cada data pode ser editada) |
+| **Boleto — cobrança única** | nenhum | uma única data de vencimento |
+| **Boleto — recorrente** | nenhum | valor **de cada boleto (mensal)**, **dia do vencimento**, **mês de início** e **mês de fim**. Um boleto por mês, já programado no Faturamento de cada mês. Em meses mais curtos vence no último dia (ex.: dia 31 → 28/02) |
 | **Cartão** | **19%** (configurável) | informe a **data de disponibilidade do recurso**. Com parcelas, a taxa é calculada sobre o total e distribuída entre elas |
 
 - O **valor bruto** entra em *Vendas efetuadas do mês* e conta para a **meta de vendas**.
 - O **valor líquido** (bruto − 19% no cartão) entra no **Faturamento** na data de recebimento.
 - Exemplo: R$ 10.000 no cartão gera **R$ 10.000 na meta de vendas**, taxa de R$ 1.900 e **R$ 8.100 no faturamento** na data informada.
 - A venda também pode ser lançada direto em Faturamento → Nova venda, sem passar pelo funil.
+- Boleto recorrente: a **venda total** (valor mensal × nº de meses) conta na meta do mês da venda. Ex.: 6 boletos de R$ 2.500 de out a mar resultam em venda de R$ 15.000 e R$ 2.500 no faturamento de cada mês.
 
 ## 3. Fórmulas
 
@@ -87,7 +90,7 @@ COMPARATIVO ANUAL (jan–dez)
 
 1. **Próximo mês** move a oportunidade para o funil do mês seguinte, adia a previsão em 1 mês e soma 1 em "Adiada".
 2. **Excluir uma venda** devolve a oportunidade ao funil (status *Em aberto*). Isso é bloqueado se alguma parcela já tiver sido recebida.
-3. **Editar uma venda** recria as parcelas quando valor, forma, número de parcelas ou datas mudam. Também é bloqueado se já houver parcela recebida, e mantém a taxa do cartão gravada na venda.
+3. **Editar uma venda** recria só as parcelas **ainda não recebidas** quando valor, forma, parcelas ou datas mudam. As recebidas são mantidas; por isso dá para prorrogar ou encurtar um boleto recorrente depois de alguns meses pagos. A mudança é recusada se uma parcela já recebida deixar de existir no novo plano (mesma data e valor). A taxa do cartão gravada na venda é mantida.
 4. A parcela de uma venda só permite alterar a **data** e a **observação**. O valor muda pela venda.
 5. Mudar a taxa do cartão nas Configurações só afeta vendas novas.
 6. Um lançamento igual feito há menos de 2 minutos gera o aviso "possível duplicidade", com opção de salvar mesmo assim.
