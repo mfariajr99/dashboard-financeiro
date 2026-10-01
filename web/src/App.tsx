@@ -14,6 +14,7 @@ const BillingPage = lazy(() => import('./features/billing/BillingPage'));
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage'));
 const GoalsPage = lazy(() => import('./features/goals/GoalsPage'));
 const CalendarPage = lazy(() => import('./features/calendar/CalendarPage'));
+const FunilVendasPage = lazy(() => import('./features/funil-vendas/FunilVendasPage'));
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage'));
 
 function PageFallback() {
@@ -47,6 +48,8 @@ function Protected() {
             <Route path="despesas" element={<Suspense fallback={<PageFallback />}><ExpensesPage /></Suspense>} />
             <Route path="metas" element={<Suspense fallback={<PageFallback />}><GoalsPage /></Suspense>} />
             <Route path="calendario" element={<Suspense fallback={<PageFallback />}><CalendarPage /></Suspense>} />
+            <Route path="vendas" element={<Navigate to="/vendas/painel" replace />} />
+            <Route path="vendas/:slug" element={<Suspense fallback={<PageFallback />}><FunilVendasPage /></Suspense>} />
             <Route path="configuracoes" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

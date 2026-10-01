@@ -1,0 +1,34 @@
+/* Funil de Vendas dentro do Dashboard Financeiro.
+   - A navegação vem do menu do Dashboard; o app só mostra o conteúdo.
+   - Telas do CRM: Deep Blue Night ocupando toda a área.
+   - Diagnóstico, apresentação e relatório: mantêm o visual claro do protótipo (tela mostrada ao cliente). */
+html{ background:#070D1E; }
+body.funil-embedded:not([data-view]){ background:#070D1E; }
+body.funil-embedded:not([data-view]) #panel .sub{ color:#94A3B8; }
+.funil-embedded .crmd-sidebar,
+.funil-embedded .crmd-bottomnav,
+.funil-embedded .brand-footer{ display:none !important; }
+body[data-view="dashboard"],
+body[data-view="callForm"],
+body[data-view="callProfileChoice"],
+body[data-view="callsHistory"],
+body[data-view="callEdit"],
+body[data-view="propostaForm"],
+body[data-view="propostasList"]{ background:#070D1E; }
+body[data-view="dashboard"] .app,
+body[data-view="callForm"] .app,
+body[data-view="callProfileChoice"] .app,
+body[data-view="callsHistory"] .app,
+body[data-view="callEdit"] .app,
+body[data-view="propostaForm"] .app,
+body[data-view="propostasList"] .app{ max-width:none; padding:0; }
+body[data-view="dashboard"] .crmd-shell,
+body[data-view="callForm"] .crmd-shell,
+body[data-view="callProfileChoice"] .crmd-shell,
+body[data-view="callsHistory"] .crmd-shell,
+body[data-view="callEdit"] .crmd-shell,
+body[data-view="propostaForm"] .crmd-shell,
+body[data-view="propostasList"] .crmd-shell{ margin:0; min-height:100dvh; }
+.funil-embedded .crmd-main{ max-width:1180px; padding:28px 32px 48px; }
+@media (max-width:860px){ .funil-embedded .crmd-main{ padding:18px 16px 40px; } }
+body.funil-embedded{ min-height:100dvh; }

@@ -103,3 +103,16 @@ authRouter.post(
     res.json({ user: publicUser(updated) });
   }),
 );
+
+const profileBody = z.object({ name: z.string().trim().min(1, 'Informe seu nome').max(80) });
+
+/** Nome exibido (menu e Funil de Vendas: "Qual o diagnóstico de hoje, <nome>?"). */
+authRouter.patch(
+  '/profile',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { name } = profileBody.parse(req.body);
+    const [updated] = await db.update(users).set({ name }).where(eq(users.id, req.user!.id)).returning();
+    res.json({ user: publicUser(updated) });
+  }),
+);

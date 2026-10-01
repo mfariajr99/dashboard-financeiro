@@ -20,6 +20,7 @@ import { ApiError } from '../lib/api';
 import { handle } from './api';
 import { DemoBar } from './DemoBar';
 
+(window as unknown as { __FINPLAN_DEMO__?: boolean }).__FINPLAN_DEMO__ = true;
 const realFetch = window.fetch.bind(window);
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

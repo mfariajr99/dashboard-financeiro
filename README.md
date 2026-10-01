@@ -247,3 +247,13 @@ Entidades trazem valores em reais (string decimal) e as visões (`dashboard`, `a
 - Um único usuário, sem perfis de acesso.
 - Os dias úteis consideram só os feriados nacionais, não os estaduais e municipais.
 - Não há conciliação bancária nem importação de extrato.
+
+## Funil de Vendas (diagnóstico de crescimento)
+
+O antigo protótipo "Diagnóstico de Crescimento" agora faz parte do Dashboard, no menu **Funil de Vendas**. Ele traz Painel, Criar Call, Histórico de Calls, Criar Proposta e Consultar Propostas. O diagnóstico em chat, a apresentação, o termômetro e os PDFs vêm junto.
+
+- Usa o **mesmo login** do Dashboard. A página (`/funil-app`) e a API (`/api/funil/*`) só respondem com sessão válida.
+- Os dados ficam no schema do Dashboard, nas tabelas `funil_calls`, `funil_propostas` e `funil_diagnosticos`.
+- No primeiro deploy, os dados do protótipo (`public.clubn_*`, no mesmo banco) são **copiados uma única vez**. As tabelas antigas não são alteradas.
+- O nome usado em "Qual o diagnóstico de hoje, …?" vem de Configurações → Seu nome.
+- Os arquivos do app ficam em `server/funil-app/`. Eles foram gerados a partir do protótipo por `server/scripts/funil_from_prototype.py`.

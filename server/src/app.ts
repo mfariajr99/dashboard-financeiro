@@ -13,6 +13,7 @@ import { logger } from './lib/logger';
 import { originGuard, requireAuth, requirePasswordChanged } from './middleware/auth';
 import { authRouter } from './routes/auth';
 import { apiRouter } from './routes/api';
+import { funilApiRouter, funilPageRouter } from './routes/funil';
 
 export function createApp(): Express {
   const app = express();
@@ -39,7 +40,9 @@ export function createApp(): Express {
     }),
   );
   app.use(compression());
-  app.use(express.json({ limit: '200kb' }));
+  // Funil de Vendas tem limite próprio (propostas com imagens); o resto da API segue com 200kb.
+  const smallJson = express.json({ limit: '200kb' });
+  app.use((req, res, next) => (req.path.startsWith('/api/funil/') ? next() : smallJson(req, res, next)));
   app.use(cookieParser());
   app.use(
     pinoHttp({
@@ -89,11 +92,16 @@ export function createApp(): Express {
   app.use('/api', originGuard);
   app.use('/api/auth', authRouter);
 
+  app.use('/api/funil', requireAuth, requirePasswordChanged, funilApiRouter);
+
   const api = express.Router();
   api.use(requireAuth, requirePasswordChanged);
   api.use(apiRouter);
   app.use('/api', api);
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Rota não encontrada', 'NOT_FOUND')));
+
+  // Funil de Vendas (app do diagnóstico), aberto dentro do Dashboard — só com login.
+  app.use('/funil-app', funilPageRouter());
 
   // Frontend (build do Vite) servido pelo mesmo processo.
   const webDist = config.WEB_DIST_PATH ?? path.resolve(__dirname, '../../web/dist');

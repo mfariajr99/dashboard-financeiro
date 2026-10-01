@@ -150,3 +150,22 @@ export const auditLogs = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+
+/**
+ * Funil de Vendas (antigo protótipo "Diagnóstico de Crescimento"): calls, propostas e diagnósticos.
+ * Mantém o formato documento (JSONB) do protótipo para preservar todos os campos já gravados.
+ */
+const funilDoc = (name: string) =>
+  pgTable(
+    name,
+    {
+      id: text('id').primaryKey(),
+      data: jsonb('data').notNull(),
+      createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    },
+    (t) => [index(`${name}_updated_idx`).on(t.updatedAt)],
+  );
+export const funilCalls = funilDoc('funil_calls');
+export const funilPropostas = funilDoc('funil_propostas');
+export const funilDiagnosticos = funilDoc('funil_diagnosticos');

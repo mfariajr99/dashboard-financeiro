@@ -56,6 +56,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     res.status(400).json({ error: 'JSON inválido', code: 'BAD_JSON' });
     return;
   }
+  if ((err as { type?: string })?.type === 'entity.too.large') {
+    res.status(413).json({ error: 'Conteúdo grande demais. Use imagens menores.', code: 'PAYLOAD_TOO_LARGE' });
+    return;
+  }
   logger.error({ err: err instanceof Error ? { message: err.message, stack: err.stack } : err, path: req.path }, 'Erro não tratado');
   res.status(500).json({ error: 'Erro interno. Tente novamente.', code: 'INTERNAL' });
 }

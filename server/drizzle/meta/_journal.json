@@ -15,6 +15,13 @@
       "when": 1790820069439,
       "tag": "0001_receivable_series",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790874565672,
+      "tag": "0002_funil_vendas",
+      "breakpoints": true
     }
   ]
 }

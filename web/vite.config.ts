@@ -26,16 +26,18 @@ export default defineConfig({
       workbox: {
         // Dados financeiros NUNCA são cacheados: somente os arquivos estáticos do app.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/funil-app(\/|$)/],
         runtimeCaching: [
           { urlPattern: ({ url }) => url.pathname.startsWith('/api/'), handler: 'NetworkOnly' },
+          // Funil de Vendas: servido pelo servidor só com login — nunca pelo cache do app.
+          { urlPattern: ({ url }) => url.pathname.startsWith('/funil-app'), handler: 'NetworkOnly' },
         ],
       },
     }),
   ],
   server: {
     port: 5173,
-    proxy: { '/api': { target: 'http://localhost:3000', changeOrigin: false } },
+    proxy: { '/api': { target: 'http://localhost:3000', changeOrigin: false }, '/funil-app': { target: 'http://localhost:3000', changeOrigin: false } },
   },
   build: {
     outDir: 'dist',
