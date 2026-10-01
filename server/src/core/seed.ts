@@ -8,7 +8,7 @@
  */
 import { addDays, addMonthsClamped, addMonthsToKey, monthOf, type ISODate } from './dates';
 import type { Repo, RequestContext } from './repo';
-import { expenses, goals, opportunities, receivables, sales } from './services';
+import { expenses, goals, opportunities, personalDebts, personalExpenses, personalMonths, receivables, sales } from './services';
 
 const CLIENTS = ['Construtora Horizonte', 'Clínica Vida', 'Loja Bella Moda', 'Grupo Atlas', 'Padaria Real', 'Mercado Bom Preço', 'Tech Solutions', 'Escola Aprender', 'Hotel Mar Azul', 'Academia Força Total', 'Rede Saúde+', 'Indústria Metalfer'];
 
@@ -126,4 +126,35 @@ export async function seedDemo(repo: Repo, today: ISODate): Promise<void> {
   const exps = (await repo.expenses.all()).sort((a, b) => (a.dueDate < b.dueDate ? 1 : -1));
   const openOne = exps.find((e) => e.dueDate < today && e.dueDate >= `${m0}-01` && e.name === 'Fornecedor de materiais');
   for (const e of exps) if (e.dueDate < today && e.id !== openOne?.id) await expenses.pay(repo, e.id, { paidDate: e.dueDate }, today);
+
+  await seedPersonal(repo, today);
+}
+
+/** Conta pessoal (exemplo): pensão todo dia 09, aluguel, escola, retirada mensal e duas dívidas. */
+async function seedPersonal(repo: Repo, today: ISODate): Promise<void> {
+  const m0 = monthOf(today);
+  const start = addMonthsToKey(m0, -2);
+  const end = addMonthsToKey(m0, 9);
+  const rec = (day: number) => ({ day, startMonth: start, endMonth: end });
+  const fixed: [string, string, number, number][] = [
+    ['Pensão', 'Pensão', 2500, 9],
+    ['Aluguel do apartamento', 'Moradia', 3200, 5],
+    ['Escola', 'Educação', 1850, 10],
+    ['Plano de saúde', 'Saúde', 980, 15],
+    ['Internet e celular', 'Assinaturas', 260, 20],
+  ];
+  for (const [name, category, amount, day] of fixed) await personalExpenses.create(repo, { name, category, amount, dueDate: `${start}-${String(day).padStart(2, '0')}`, recurrence: rec(day), force: true }, today);
+  await personalExpenses.create(repo, { name: 'Mercado', category: 'Alimentação', amount: 1600, dueDate: `${m0}-03`, force: true }, today);
+  // tudo vencido até ontem está pago, exceto a escola deste mês (em aberto)
+  for (const e of await repo.personalExpenses.all()) if (e.dueDate < today && !(e.name === 'Escola' && monthOf(e.dueDate) === m0)) await personalExpenses.pay(repo, e.id, { paidDate: e.dueDate }, today);
+
+  await personalMonths.setWithdrawal(repo, start, { withdrawal: 15000, applyForward: true });
+  if (start.slice(0, 4) !== end.slice(0, 4)) await personalMonths.setWithdrawal(repo, `${end.slice(0, 4)}-01`, { withdrawal: 15000, applyForward: true });
+
+  await personalDebts.create(repo, { name: 'Empréstimo pessoal', creditor: 'Banco do Brasil', totalAmount: 18000, installments: 12, dueDay: 12, startMonth: start, paidCount: 2 });
+  await personalDebts.create(repo, { name: 'Notebook parcelado', creditor: 'Cartão Itaú', totalAmount: 4800, installments: 6, dueDay: 25, startMonth: addMonthsToKey(m0, -1), paidCount: 1 });
+  // parcelas vencidas até ontem: pagas, exceto a do empréstimo deste mês (exemplo de atraso)
+  for (const x of await repo.debtInstallments.all()) if (x.status !== 'PAGA' && x.dueDate < today && monthOf(x.dueDate) !== m0) await personalDebts.pay(repo, x.id, { paidDate: x.dueDate }, today);
+  const nb = (await repo.personalDebts.all()).find((d) => d.name === 'Notebook parcelado');
+  for (const x of await repo.debtInstallments.all()) if (x.debtId === nb?.id && x.status !== 'PAGA' && x.dueDate < today) await personalDebts.pay(repo, x.id, { paidDate: x.dueDate }, today);
 }

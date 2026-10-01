@@ -2,9 +2,9 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { NewRow, Repo, Table } from '../core/repo';
-import { DEFAULT_SETTINGS, type Expense, type Goal, type Opportunity, type Receivable, type Sale, type Settings } from '../core/types';
+import { DEFAULT_SETTINGS, type DebtInstallment, type Expense, type Goal, type Opportunity, type PersonalDebt, type PersonalExpense, type PersonalMonth, type Receivable, type Sale, type Settings } from '../core/types';
 import { db as rootDb, type DB, type Tx } from './client';
-import { appSettings, auditLogs, expenses, goals, opportunities, receivables, sales } from './schema';
+import { appSettings, auditLogs, debtInstallments, expenses, goals, opportunities, personalDebts, personalExpenses, personalMonths, receivables, sales } from './schema';
 
 type Exec = DB | Tx;
 type AnyTable = PgTable & { id: Parameters<typeof eq>[0] };
@@ -40,6 +40,10 @@ export class DrizzleRepo implements Repo {
   receivables: Table<Receivable>;
   expenses: Table<Expense>;
   goals: Table<Goal>;
+  personalExpenses: Table<PersonalExpense>;
+  personalDebts: Table<PersonalDebt>;
+  debtInstallments: Table<DebtInstallment>;
+  personalMonths: Table<PersonalMonth>;
   constructor(
     private exec: Exec = rootDb,
     private userId: string | null = null,
@@ -49,6 +53,10 @@ export class DrizzleRepo implements Repo {
     this.receivables = table<Receivable>(exec, receivables as unknown as AnyTable);
     this.expenses = table<Expense>(exec, expenses as unknown as AnyTable);
     this.goals = table<Goal>(exec, goals as unknown as AnyTable);
+    this.personalExpenses = table<PersonalExpense>(exec, personalExpenses as unknown as AnyTable);
+    this.personalDebts = table<PersonalDebt>(exec, personalDebts as unknown as AnyTable);
+    this.debtInstallments = table<DebtInstallment>(exec, debtInstallments as unknown as AnyTable);
+    this.personalMonths = table<PersonalMonth>(exec, personalMonths as unknown as AnyTable);
   }
 
   async getSettings(): Promise<Settings> {

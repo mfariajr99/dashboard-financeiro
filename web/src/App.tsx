@@ -15,6 +15,9 @@ const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage'));
 const GoalsPage = lazy(() => import('./features/goals/GoalsPage'));
 const CalendarPage = lazy(() => import('./features/calendar/CalendarPage'));
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage'));
+const PersonalOverviewPage = lazy(() => import('./features/personal/PersonalOverviewPage'));
+const PersonalExpensesPage = lazy(() => import('./features/personal/PersonalExpensesPage'));
+const DebtsPage = lazy(() => import('./features/personal/DebtsPage'));
 
 function PageFallback() {
   return (
@@ -47,6 +50,9 @@ function Protected() {
             <Route path="despesas" element={<Suspense fallback={<PageFallback />}><ExpensesPage /></Suspense>} />
             <Route path="metas" element={<Suspense fallback={<PageFallback />}><GoalsPage /></Suspense>} />
             <Route path="calendario" element={<Suspense fallback={<PageFallback />}><CalendarPage /></Suspense>} />
+            <Route path="pessoal" element={<Suspense fallback={<PageFallback />}><PersonalOverviewPage /></Suspense>} />
+            <Route path="pessoal/despesas" element={<Suspense fallback={<PageFallback />}><PersonalExpensesPage /></Suspense>} />
+            <Route path="pessoal/dividas" element={<Suspense fallback={<PageFallback />}><DebtsPage /></Suspense>} />
             <Route path="configuracoes" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

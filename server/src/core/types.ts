@@ -69,6 +69,8 @@ export interface Receivable extends Stamped {
   status: ReceivableStatus;
   receivedDate: ISODate | null;
   notes: string | null;
+  /** Receita avulsa recorrente (mesmo id em todos os meses da recorrência). */
+  seriesId?: string | null;
 }
 
 export type ExpenseStatus = 'PENDENTE' | 'PAGA';
@@ -106,3 +108,39 @@ export const DEFAULT_SETTINGS: Settings = {
   timezone: 'America/Sao_Paulo',
   companyName: 'Dashboard Financeiro',
 };
+
+// ================================================================== CONTA PESSOAL
+// Totalmente separada do dashboard da empresa: tabelas, telas e cálculos próprios.
+
+/** Despesa pessoal — mesmo formato da despesa da empresa (única ou recorrente). */
+export type PersonalExpense = Expense;
+
+/** Dívida pessoal, paga em parcelas mensais. */
+export interface PersonalDebt extends Stamped {
+  name: string;
+  creditor: string | null;
+  totalAmount: string;
+  installments: number;
+  /** Dia do vencimento das parcelas (1–31; meses curtos vencem no último dia). */
+  dueDay: number;
+  /** Mês da 1ª parcela (YYYY-MM). */
+  startMonth: MonthKey;
+  notes: string | null;
+}
+
+export type DebtInstallmentStatus = 'PENDENTE' | 'PAGA';
+export interface DebtInstallment extends Stamped {
+  debtId: string;
+  number: number;
+  count: number;
+  amount: string;
+  dueDate: ISODate;
+  status: DebtInstallmentStatus;
+  paidDate: ISODate | null;
+}
+
+/** Valor da retirada (pró-labore / entrada pessoal) de cada mês. */
+export interface PersonalMonth extends Stamped {
+  month: MonthKey;
+  withdrawal: string;
+}

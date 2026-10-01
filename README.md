@@ -19,13 +19,28 @@ Stack: React + TypeScript (front), Node + TypeScript (API) e PostgreSQL. O login
 |---|---|
 | **Dashboard** | Quatro blocos, nada além disso. **Faturamento do mês**: recebido, em aberto (vencido) e a vencer. **Vendas**: barra com vendido, funil quente e marcador da meta, mais quanto falta, dias úteis restantes e quanto vender por dia útil. **Resultado**: faturamento previsto − despesas = lucro/prejuízo e margem %. **Comparativo anual** Meta × Venda (Mês a mês / Acumulado), com tabela de % da meta, crescimento m/m e totais. |
 | **Funil quente** | Cadastro de oportunidades do mês com três ações: **Venda efetuada**, **Próximo mês** (passa para o funil do mês seguinte e conta "Adiada Nx") e **Declinou** (pode ser reaberta). Cada cartão tem botão de consulta/edição e de exclusão. |
-| **Faturamento** | Duas abas. **Receitas programadas** são as parcelas a receber por data, com tipo Cartão/Boleto/Pix e situação Recebido/Em aberto/A vencer; dá para marcar como recebida ou desfazer. **Vendas efetuadas** traz cada venda com suas parcelas. Também permite cadastrar **receita avulsa**. |
-| **Despesas** | Cadastro e edição com vencimento, categoria e fornecedor, marcar como paga, repetir por N meses (série) e excluir só esta ou a série inteira. |
+| **Faturamento** | Duas abas. **Receitas programadas** são as parcelas a receber por data, com tipo Cartão/Boleto/Pix e situação Recebido/Em aberto/A vencer; dá para marcar como recebida ou desfazer. **Vendas efetuadas** traz cada venda com suas parcelas. Também permite cadastrar **receita avulsa**, **única** (uma data) ou **recorrente** (valor mensal, dia do vencimento, mês de início e de fim). Ao editar uma receita recorrente, escolha *Só esta receita* ou *Toda a recorrência*; ao excluir, *só esta* ou *esta e as próximas não recebidas*. |
+| **Despesas** | Cadastro e edição com vencimento, categoria e fornecedor. **Despesa única** (uma data) ou **recorrente** (valor de cada mês, dia do vencimento, mês de início e de fim; ex.: Salário todo dia 12). Na edição de uma recorrente: *Só esta despesa* ou *Esta e as próximas*, que replica valor e dados do mês dela em diante, prorroga ou encurta o mês de fim e mantém as já pagas. Marcar como paga; excluir só esta ou esta e as próximas não pagas. |
 | **Metas** | Grade jan–dez com **meta de vendas** e **meta de faturamento** por mês e um botão "copiar para os meses seguintes". |
 | **Calendário** | Visões mês e lista com receitas, despesas, vendas e oportunidades previstas, mais feriados nacionais. Tocar no dia abre o resumo, e cada item abre o cadastro para edição. |
 | **Configurações** | Taxa do cartão (padrão 19%) e troca de senha. |
 
 O botão **+** (canto inferior no celular, topo no desktop) cria oportunidade, venda, receita ou despesa de qualquer tela.
+
+### Conta Pessoal (separada da empresa)
+Área própria no menu para as finanças pessoais. Usa tabelas próprias (`personal_*`, `debt_installments`) e **não entra** em nenhum número do dashboard da empresa.
+
+| Tela | O que faz |
+|---|---|
+| **Visão geral** | Para o mês escolhido: valor da retirada (editável, com opção de repetir até dezembro), total de despesas, despesas já pagas, total de dívidas (parcelas do mês), dívidas quitadas e **saving** (R$ e % da retirada). Abaixo, a tabela jan–dez com os mesmos campos e o total do ano. |
+| **Despesas do mês** | Cadastro, consulta e edição. **Única** ou **recorrente** (ex.: Pensão todo dia 09, do mês de início ao de fim). Marcar como paga. Na edição de uma recorrente: *Só esta* ou *Esta e as próximas*. |
+| **Dívidas** | Cadastro com credor, valor total, nº de parcelas, dia do vencimento, mês da 1ª parcela e parcelas já pagas (para dívidas em andamento). Mostra saldo devedor, atraso, progresso e as parcelas do mês com botão de pagar. Editar o valor ou o plano mantém as parcelas pagas e redistribui o restante. |
+
+```
+Saving do mês = retirada − despesas do mês − parcelas de dívidas do mês
+% saving      = saving ÷ retirada
+Saldo devedor = soma das parcelas de dívidas ainda não pagas
+```
 
 ## 2. Fluxo principal: do funil ao faturamento
 
@@ -91,6 +106,8 @@ COMPARATIVO ANUAL (jan–dez)
 1. **Próximo mês** move a oportunidade para o funil do mês seguinte, adia a previsão em 1 mês e soma 1 em "Adiada".
 2. **Excluir uma venda** devolve a oportunidade ao funil (status *Em aberto*). Isso é bloqueado se alguma parcela já tiver sido recebida.
 3. **Editar uma venda** recria só as parcelas **ainda não recebidas** quando valor, forma, parcelas ou datas mudam. As recebidas são mantidas; por isso dá para prorrogar ou encurtar um boleto recorrente depois de alguns meses pagos. A mudança é recusada se uma parcela já recebida deixar de existir no novo plano (mesma data e valor). A taxa do cartão gravada na venda é mantida.
+   O **valor da venda** pode ser alterado a qualquer momento: as parcelas recebidas ficam como estão e o restante do novo valor é dividido entre as parcelas em aberto. Não pode ficar abaixo do já recebido.
+   **Valor de uma parcela**: pode ser editado no Faturamento (inclusive no cartão, com a taxa recalculada); o total da venda passa a ser a soma das parcelas.
 4. A parcela de uma venda só permite alterar a **data** e a **observação**. O valor muda pela venda.
 5. Mudar a taxa do cartão nas Configurações só afeta vendas novas.
 6. Um lançamento igual feito há menos de 2 minutos gera o aviso "possível duplicidade", com opção de salvar mesmo assim.

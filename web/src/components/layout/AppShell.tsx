@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { CalendarDays, Flame, Goal, LayoutDashboard, LogOut, Menu, Plus, Receipt, Settings, ShoppingCart, Target, Wallet, X } from 'lucide-react';
+import { CalendarDays, CreditCard, Flame, Goal, LayoutDashboard, LogOut, Menu, PiggyBank, Plus, Receipt, Settings, ShoppingCart, Target, Wallet, X } from 'lucide-react';
 import { Brand } from './Brand';
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -7,23 +7,47 @@ import { useAuth } from '../../lib/auth';
 import { IconButton } from '../ui/primitives';
 import { useQuickActions } from './QuickActions';
 
-const NAV = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean };
+const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/funil', label: 'Funil quente', icon: Flame },
   { to: '/faturamento', label: 'Faturamento', icon: Wallet },
   { to: '/despesas', label: 'Despesas', icon: Receipt },
   { to: '/metas', label: 'Metas', icon: Goal },
   { to: '/calendario', label: 'Calendário', icon: CalendarDays },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
+/** Conta pessoal: área separada do dashboard da empresa. */
+const NAV_PERSONAL: NavItem[] = [
+  { to: '/pessoal', label: 'Visão geral', icon: PiggyBank, end: true },
+  { to: '/pessoal/despesas', label: 'Despesas do mês', icon: Receipt },
+  { to: '/pessoal/dividas', label: 'Dívidas', icon: CreditCard },
+];
+const NAV_SETTINGS: NavItem = { to: '/configuracoes', label: 'Configurações', icon: Settings };
 const BOTTOM = [NAV[0], NAV[1], NAV[2], NAV[3]];
+const BOTTOM_PERSONAL = [NAV_PERSONAL[0], NAV_PERSONAL[1], NAV_PERSONAL[2], NAV[0]];
+const isPersonal = (path: string) => path === '/pessoal' || path.startsWith('/pessoal/');
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1" aria-label="Menu principal">
-      {NAV.map(({ to, label, icon: Icon, end }) => (
+      <p className="label px-3 pb-1 uppercase tracking-[0.12em]">Empresa</p>
+      {NAV.map((n) => (
+        <NavRow key={n.to} {...n} onNavigate={onNavigate} />
+      ))}
+      <p className="label mt-5 px-3 pb-1 uppercase tracking-[0.12em]">Conta Pessoal</p>
+      {NAV_PERSONAL.map((n) => (
+        <NavRow key={n.to} {...n} onNavigate={onNavigate} />
+      ))}
+      <div className="mt-5" />
+      <NavRow {...NAV_SETTINGS} onNavigate={onNavigate} />
+    </nav>
+  );
+}
+
+function NavRow({ to, label, icon: Icon, end, onNavigate }: NavItem & { onNavigate?: () => void }) {
+  return (
+    <>
         <NavLink
-          key={to}
           to={to}
           end={end}
           onClick={onNavigate}
@@ -41,19 +65,24 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
             </>
           )}
         </NavLink>
-      ))}
-    </nav>
+    </>
   );
 }
 
 function QuickMenu({ onClose, className }: { onClose: () => void; className?: string }) {
   const qa = useQuickActions();
-  const items = [
-    { label: 'Nova oportunidade', icon: Target, action: qa.newOpportunity, color: 'text-violet' },
-    { label: 'Nova venda efetuada', icon: ShoppingCart, action: qa.newSale, color: 'text-accent' },
-    { label: 'Nova receita', icon: Wallet, action: qa.newReceivable, color: 'text-success' },
-    { label: 'Nova despesa', icon: Receipt, action: qa.newExpense, color: 'text-warning' },
-  ];
+  const loc = useLocation();
+  const items = isPersonal(loc.pathname)
+    ? [
+        { label: 'Nova despesa pessoal', icon: Receipt, action: qa.newPersonalExpense, color: 'text-warning' },
+        { label: 'Nova dívida', icon: CreditCard, action: qa.newDebt, color: 'text-[#F87171]' },
+      ]
+    : [
+        { label: 'Nova oportunidade', icon: Target, action: qa.newOpportunity, color: 'text-violet' },
+        { label: 'Nova venda efetuada', icon: ShoppingCart, action: qa.newSale, color: 'text-accent' },
+        { label: 'Nova receita', icon: Wallet, action: qa.newReceivable, color: 'text-success' },
+        { label: 'Nova despesa', icon: Receipt, action: qa.newExpense, color: 'text-warning' },
+      ];
   return (
     <div className={clsx('w-56 animate-slide-up rounded-card border border-line bg-elevated p-2 shadow-pop', className ?? 'absolute bottom-[calc(100%+12px)] right-0')} role="menu">
       {items.map(({ label, icon: Icon, action, color }) => (
@@ -157,7 +186,7 @@ export function AppShell({ headerRight }: { headerRight?: ReactNode }) {
       {/* Navegação inferior (mobile) com botão central de ação rápida */}
       <nav className="no-print pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[#0A1328]/95 backdrop-blur lg:hidden" aria-label="Navegação rápida">
         <div className="mx-auto grid max-w-md grid-cols-5 items-end px-2 pt-1.5">
-          {BOTTOM.slice(0, 2).map((n) => (
+          {(isPersonal(loc.pathname) ? BOTTOM_PERSONAL : BOTTOM).slice(0, 2).map((n) => (
             <BottomLink key={n.to} {...n} />
           ))}
           <div className="relative flex justify-center">
@@ -175,7 +204,7 @@ export function AppShell({ headerRight }: { headerRight?: ReactNode }) {
               <Plus className={clsx('h-7 w-7 transition-transform', fab && 'rotate-45')} />
             </button>
           </div>
-          {BOTTOM.slice(2).map((n) => (
+          {(isPersonal(loc.pathname) ? BOTTOM_PERSONAL : BOTTOM).slice(2).map((n) => (
             <BottomLink key={n.to} {...n} />
           ))}
         </div>
@@ -185,7 +214,7 @@ export function AppShell({ headerRight }: { headerRight?: ReactNode }) {
   );
 }
 
-function BottomLink({ to, label, icon: Icon, end }: (typeof NAV)[number]) {
+function BottomLink({ to, label, icon: Icon, end }: NavItem) {
   return (
     <NavLink
       to={to}

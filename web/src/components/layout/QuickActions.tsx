@@ -4,8 +4,9 @@ import { ReceivableForm } from '../../features/billing/ReceivableForm';
 import { SaleDialog, type SaleDialogMode } from '../../features/billing/SaleDialog';
 import { ExpenseForm } from '../../features/expenses/ExpenseForm';
 import { OpportunityForm } from '../../features/funnel/OpportunityForm';
+import { DebtForm } from '../../features/personal/DebtForm';
 import { api } from '../../lib/api';
-import type { ExpenseRow, Opportunity, ReceivableRow, SaleDetail } from '../../lib/types';
+import type { DebtRow, ExpenseRow, Opportunity, ReceivableRow, SaleDetail } from '../../lib/types';
 
 /** Abre cadastros/consultas de qualquer tela (botão +, dashboard, calendário, listas). */
 interface Ctx {
@@ -18,11 +19,22 @@ interface Ctx {
   openReceivable: (r: ReceivableRow) => void;
   newExpense: () => void;
   openExpense: (e: ExpenseRow) => void;
+  // Conta pessoal
+  newPersonalExpense: () => void;
+  openPersonalExpense: (e: ExpenseRow) => void;
+  newDebt: () => void;
+  openDebt: (d: DebtRow) => void;
   openById: (kind: 'RECEITA' | 'DESPESA' | 'OPORTUNIDADE' | 'VENDA', id: string) => Promise<void>;
 }
 const QA = createContext<Ctx | null>(null);
 
-type State = { kind: 'opp'; item: Opportunity | null } | { kind: 'rec'; item: ReceivableRow | null } | { kind: 'exp'; item: ExpenseRow | null } | null;
+type State =
+  | { kind: 'opp'; item: Opportunity | null }
+  | { kind: 'rec'; item: ReceivableRow | null }
+  | { kind: 'exp'; item: ExpenseRow | null }
+  | { kind: 'pexp'; item: ExpenseRow | null }
+  | { kind: 'debt'; item: DebtRow | null }
+  | null;
 
 export function QuickActionsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(null);
@@ -45,6 +57,10 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     openReceivable: (r) => setState({ kind: 'rec', item: r }),
     newExpense: () => setState({ kind: 'exp', item: null }),
     openExpense: (e) => setState({ kind: 'exp', item: e }),
+    newPersonalExpense: () => setState({ kind: 'pexp', item: null }),
+    openPersonalExpense: (e) => setState({ kind: 'pexp', item: e }),
+    newDebt: () => setState({ kind: 'debt', item: null }),
+    openDebt: (d) => setState({ kind: 'debt', item: d }),
     openById: (kind, id) =>
       guard(async () => {
         if (kind === 'RECEITA') setState({ kind: 'rec', item: await api.get<ReceivableRow>(`/api/receivables/${id}`) });
@@ -59,6 +75,8 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
       <OpportunityForm open={state?.kind === 'opp'} onClose={close} opportunity={state?.kind === 'opp' ? state.item : null} />
       <ReceivableForm open={state?.kind === 'rec'} onClose={close} receivable={state?.kind === 'rec' ? state.item : null} />
       <ExpenseForm open={state?.kind === 'exp'} onClose={close} expense={state?.kind === 'exp' ? state.item : null} />
+      <ExpenseForm personal open={state?.kind === 'pexp'} onClose={close} expense={state?.kind === 'pexp' ? state.item : null} />
+      <DebtForm open={state?.kind === 'debt'} onClose={close} debt={state?.kind === 'debt' ? state.item : null} />
       <SaleDialog mode={sale} onClose={() => setSale(null)} />
     </QA.Provider>
   );

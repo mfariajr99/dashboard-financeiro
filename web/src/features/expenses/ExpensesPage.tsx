@@ -9,20 +9,32 @@ import { api } from '../../lib/api';
 import { brl$, brlC, dateBR, monthLabel } from '../../lib/format';
 import { COLORS, EXP_SITUATION } from '../../lib/labels';
 import { MonthPicker, useMonth } from '../../lib/month';
-import { useDashboard, useExpenses, useFinMutation } from '../../lib/queries';
+import { useExpenses, useFinMutation, useSettings } from '../../lib/queries';
 import type { ExpenseRow, ExpenseSituation } from '../../lib/types';
 
-export default function ExpensesPage() {
+/** Lista de despesas do mês. `personal` = Conta pessoal (dados separados da empresa). */
+export function ExpensesList({ personal = false }: { personal?: boolean }) {
+  const base = personal ? '/api/personal/expenses' : '/api/expenses';
   const { month } = useMonth();
   const qa = useQuickActions();
   const confirm = useConfirm();
   const [sit, setSit] = useState<ExpenseSituation[]>([]);
   const [q, setQ] = useState('');
-  const list = useExpenses({ month, q: q || undefined });
-  const e = useDashboard(month).data?.expenses;
-  const pay = useFinMutation((id: string) => api.patch(`/api/expenses/${id}/pay`, {}), { success: 'Despesa paga' });
-  const unpay = useFinMutation((id: string) => api.patch(`/api/expenses/${id}/unpay`, {}), { success: 'Pagamento desfeito' });
-  const del = useFinMutation((v: { id: string; series: boolean }) => api.del<{ removed: number }>(`/api/expenses/${v.id}${v.series ? '?series=true' : ''}`), { success: (r) => `${(r as { removed: number }).removed} despesa(s) excluída(s)` });
+  const list = useExpenses({ month, q: q || undefined }, base);
+  const monthAll = useExpenses({ month }, base).data;
+  const today = useSettings().data?.today ?? '';
+  // totais do mês (mesmas regras do dashboard: em aberto = vencida e não paga)
+  const e = monthAll && {
+    total: sum(monthAll),
+    paid: sum(monthAll.filter((x) => x.status === 'PAGA')),
+    open: sum(monthAll.filter((x) => x.status !== 'PAGA' && x.dueDate < today)),
+    upcoming: sum(monthAll.filter((x) => x.status !== 'PAGA' && x.dueDate >= today)),
+  };
+  const openNew = personal ? qa.newPersonalExpense : qa.newExpense;
+  const openOne = (x: ExpenseRow): void => (personal ? qa.openPersonalExpense(x) : qa.openExpense(x));
+  const pay = useFinMutation((id: string) => api.patch(`${base}/${id}/pay`, {}), { success: 'Despesa paga' });
+  const unpay = useFinMutation((id: string) => api.patch(`${base}/${id}/unpay`, {}), { success: 'Pagamento desfeito' });
+  const del = useFinMutation((v: { id: string; series: boolean }) => api.del<{ removed: number }>(`${base}/${v.id}${v.series ? '?series=true' : ''}`), { success: (r) => `${(r as { removed: number }).removed} despesa(s) excluída(s)` });
   const items = (list.data ?? []).filter((x) => !sit.length || sit.includes(x.situation));
 
   const remove = async (x: ExpenseRow) => {
@@ -36,12 +48,12 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Despesas"
-        subtitle="Cadastro e vencimentos"
+        title={personal ? 'Despesas do mês' : 'Despesas'}
+        subtitle={personal ? 'Conta pessoal · cadastro, vencimentos e pagamentos' : 'Cadastro e vencimentos'}
         actions={
           <>
             <MonthPicker />
-            <Button icon={<Plus className="h-4 w-4" />} onClick={qa.newExpense}>
+            <Button icon={<Plus className="h-4 w-4" />} onClick={openNew}>
               Nova despesa
             </Button>
           </>
@@ -65,7 +77,7 @@ export default function ExpensesPage() {
         <Skeleton className="h-60" />
       ) : items.length === 0 ? (
         <Card>
-          <EmptyState icon={<Receipt className="h-6 w-6" />} title="Nenhuma despesa" description={`Sem despesas em ${monthLabel(month).toLowerCase()} com esse filtro.`} action={<Button onClick={qa.newExpense}>Nova despesa</Button>} />
+          <EmptyState icon={<Receipt className="h-6 w-6" />} title="Nenhuma despesa" description={`Sem despesas em ${monthLabel(month).toLowerCase()} com esse filtro.`} action={<Button onClick={openNew}>Nova despesa</Button>} />
         </Card>
       ) : (
         <ul className="space-y-2">
@@ -75,9 +87,9 @@ export default function ExpensesPage() {
                 <p className="text-[18px] font-bold leading-none text-white">{x.dueDate.slice(8)}</p>
                 <p className="text-[11px] italic text-ink-muted">{x.dueDate.slice(5, 7)}/{x.dueDate.slice(2, 4)}</p>
               </div>
-              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => qa.openExpense(x)}>
+              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openOne(x)}>
                 <p className="truncate font-medium text-ink-title hover:text-accent">{x.name}</p>
-                <p className="label truncate">{[x.category, x.supplier, x.seriesCount ? `${x.seriesIndex}/${x.seriesCount}` : null].filter(Boolean).join(' · ') || 'Sem categoria'}</p>
+                <p className="label truncate">{[x.category, x.supplier, x.seriesCount ? `recorrente ${x.seriesIndex}/${x.seriesCount}` : null].filter(Boolean).join(' · ') || 'Sem categoria'}</p>
               </button>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <span className="text-[15px] font-semibold tabular-nums text-white">{brl$(x.amount)}</span>
@@ -93,7 +105,7 @@ export default function ExpensesPage() {
                     <CheckCircle2 className="h-5 w-5" />
                   </IconButton>
                 )}
-                <IconButton label="Consultar / editar" className="hidden sm:inline-flex" onClick={() => qa.openExpense(x)}>
+                <IconButton label="Consultar / editar" className="hidden sm:inline-flex" onClick={() => openOne(x)}>
                   <Eye className="h-[18px] w-[18px]" />
                 </IconButton>
                 <IconButton label="Excluir" className="hidden sm:inline-flex" onClick={() => remove(x)}>
@@ -118,4 +130,10 @@ function Box({ label, value, color, danger }: { label: string; value: string; co
       <p className={clsx('kpi-value truncate text-[17px] sm:text-[20px]', danger && 'text-[#F87171]')}>{value}</p>
     </div>
   );
+}
+
+const sum = (l: ExpenseRow[]) => l.reduce((a, x) => a + Math.round(Number(x.amount) * 100), 0);
+
+export default function ExpensesPage() {
+  return <ExpensesList />;
 }

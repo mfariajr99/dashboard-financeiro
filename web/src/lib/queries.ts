@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api, qs, type ApiError } from './api';
-import type { CalendarResponse, Dashboard, ExpenseRow, GoalRow, Opportunity, ReceivableRow, SaleRow, Settings, Annual } from './types';
+import type { CalendarResponse, Dashboard, DebtDetail, DebtInstallmentRow, DebtRow, ExpenseDetail, ExpenseRow, PersonalOverview, GoalRow, Opportunity, ReceivableDetail, ReceivableRow, SaleRow, Settings, Annual } from './types';
 
 /** Todas as consultas de dados começam com 'fin' — qualquer gravação invalida o conjunto. */
 export const FIN = 'fin';
@@ -24,8 +24,28 @@ export function useSales(p: { month?: string; q?: string }) {
 export function useReceivables(p: { month?: string; situation?: string; q?: string }) {
   return useQuery({ queryKey: [FIN, 'receivables', p], queryFn: () => api.get<ReceivableRow[]>(`/api/receivables${qs(p)}`), placeholderData: keepPreviousData });
 }
-export function useExpenses(p: { month?: string; situation?: string; q?: string }) {
-  return useQuery({ queryKey: [FIN, 'expenses', p], queryFn: () => api.get<ExpenseRow[]>(`/api/expenses${qs(p)}`), placeholderData: keepPreviousData });
+export function useReceivable(id: string | null | undefined) {
+  return useQuery({ queryKey: [FIN, 'receivable', id], queryFn: () => api.get<ReceivableDetail>(`/api/receivables/${id}`), enabled: !!id });
+}
+export function useExpense(id: string | null | undefined, base = '/api/expenses') {
+  return useQuery({ queryKey: [FIN, 'expense', base, id], queryFn: () => api.get<ExpenseDetail>(`${base}/${id}`), enabled: !!id });
+}
+export function useExpenses(p: { month?: string; situation?: string; q?: string }, base = '/api/expenses') {
+  return useQuery({ queryKey: [FIN, 'expenses', base, p], queryFn: () => api.get<ExpenseRow[]>(`${base}${qs(p)}`), placeholderData: keepPreviousData });
+}
+
+// ---------------------------------------------------------------- Conta pessoal
+export function usePersonalOverview(year: number) {
+  return useQuery({ queryKey: [FIN, 'personal-overview', year], queryFn: () => api.get<PersonalOverview>(`/api/personal/overview${qs({ year })}`), placeholderData: keepPreviousData });
+}
+export function useDebts(p: { q?: string; status?: string }) {
+  return useQuery({ queryKey: [FIN, 'debts', p], queryFn: () => api.get<DebtRow[]>(`/api/personal/debts${qs(p)}`), placeholderData: keepPreviousData });
+}
+export function useDebt(id: string | null | undefined) {
+  return useQuery({ queryKey: [FIN, 'debt', id], queryFn: () => api.get<DebtDetail>(`/api/personal/debts/${id}`), enabled: !!id });
+}
+export function useDebtInstallments(month: string) {
+  return useQuery({ queryKey: [FIN, 'debt-installments', month], queryFn: () => api.get<DebtInstallmentRow[]>(`/api/personal/debt-installments${qs({ month })}`), placeholderData: keepPreviousData });
 }
 export function useGoals(year: number) {
   return useQuery({ queryKey: [FIN, 'goals', year], queryFn: () => api.get<GoalRow[]>(`/api/goals${qs({ year })}`) });

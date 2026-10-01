@@ -4,7 +4,7 @@
  */
 import { monthOf } from './dates';
 import type { Repo, RequestContext } from './repo';
-import { expenses, goals, opportunities, receivables, sales, settings, views } from './services';
+import { expenses, goals, opportunities, personalDebts, personalExpenses, personalMonths, personalOverview, receivables, sales, settings, views } from './services';
 
 export interface RouteInput {
   repo: Repo;
@@ -52,7 +52,7 @@ export const routes: RouteDef[] = [
   { method: 'PUT', path: '/receivables/:id', handler: ({ repo, params, body }) => receivables.update(repo, params.id, body) },
   { method: 'PATCH', path: '/receivables/:id/receive', handler: ({ repo, ctx, params, body }) => receivables.receive(repo, params.id, body, ctx.today) },
   { method: 'PATCH', path: '/receivables/:id/unreceive', handler: ({ repo, params }) => receivables.unreceive(repo, params.id) },
-  { method: 'DELETE', path: '/receivables/:id', handler: async ({ repo, params }) => (await receivables.remove(repo, params.id), noContent) },
+  { method: 'DELETE', path: '/receivables/:id', handler: ({ repo, params, query }) => receivables.remove(repo, params.id, query.get('series') === 'true') },
 
   // Despesas
   { method: 'GET', path: '/expenses', handler: ({ repo, ctx, query }) => expenses.list(repo, { month: query.get('month'), situation: query.get('situation'), q: query.get('q') }, ctx.today) },
@@ -62,6 +62,25 @@ export const routes: RouteDef[] = [
   { method: 'PATCH', path: '/expenses/:id/pay', handler: ({ repo, ctx, params, body }) => expenses.pay(repo, params.id, body, ctx.today) },
   { method: 'PATCH', path: '/expenses/:id/unpay', handler: ({ repo, params }) => expenses.unpay(repo, params.id) },
   { method: 'DELETE', path: '/expenses/:id', handler: ({ repo, params, query }) => expenses.remove(repo, params.id, query.get('series') === 'true') },
+
+  // Conta pessoal (separada da empresa)
+  { method: 'GET', path: '/personal/overview', handler: ({ repo, ctx, query }) => personalOverview(repo, year(query, ctx.today), ctx.today) },
+  { method: 'PUT', path: '/personal/months/:month', handler: ({ repo, params, body }) => personalMonths.setWithdrawal(repo, params.month, body) },
+  { method: 'GET', path: '/personal/expenses', handler: ({ repo, ctx, query }) => personalExpenses.list(repo, { month: query.get('month'), situation: query.get('situation'), q: query.get('q') }, ctx.today) },
+  { method: 'POST', path: '/personal/expenses', handler: async ({ repo, ctx, body }) => created(await personalExpenses.create(repo, body, ctx.today)) },
+  { method: 'GET', path: '/personal/expenses/:id', handler: ({ repo, ctx, params }) => personalExpenses.get(repo, params.id, ctx.today) },
+  { method: 'PUT', path: '/personal/expenses/:id', handler: ({ repo, params, body }) => personalExpenses.update(repo, params.id, body) },
+  { method: 'PATCH', path: '/personal/expenses/:id/pay', handler: ({ repo, ctx, params, body }) => personalExpenses.pay(repo, params.id, body, ctx.today) },
+  { method: 'PATCH', path: '/personal/expenses/:id/unpay', handler: ({ repo, params }) => personalExpenses.unpay(repo, params.id) },
+  { method: 'DELETE', path: '/personal/expenses/:id', handler: ({ repo, params, query }) => personalExpenses.remove(repo, params.id, query.get('series') === 'true') },
+  { method: 'GET', path: '/personal/debts', handler: ({ repo, ctx, query }) => personalDebts.list(repo, { q: query.get('q'), status: query.get('status') }, ctx.today) },
+  { method: 'POST', path: '/personal/debts', handler: async ({ repo, body }) => created(await personalDebts.create(repo, body)) },
+  { method: 'GET', path: '/personal/debts/:id', handler: ({ repo, ctx, params }) => personalDebts.get(repo, params.id, ctx.today) },
+  { method: 'PUT', path: '/personal/debts/:id', handler: ({ repo, params, body }) => personalDebts.update(repo, params.id, body) },
+  { method: 'DELETE', path: '/personal/debts/:id', handler: async ({ repo, params }) => (await personalDebts.remove(repo, params.id), noContent) },
+  { method: 'GET', path: '/personal/debt-installments', handler: ({ repo, ctx, query }) => personalDebts.installments(repo, query.get('month'), ctx.today) },
+  { method: 'PATCH', path: '/personal/debt-installments/:id/pay', handler: ({ repo, ctx, params, body }) => personalDebts.pay(repo, params.id, body, ctx.today) },
+  { method: 'PATCH', path: '/personal/debt-installments/:id/unpay', handler: ({ repo, params }) => personalDebts.unpay(repo, params.id) },
 
   // Metas
   { method: 'GET', path: '/goals', handler: ({ repo, ctx, query }) => goals.year(repo, year(query, ctx.today)) },

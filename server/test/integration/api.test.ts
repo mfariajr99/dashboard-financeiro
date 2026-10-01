@@ -129,6 +129,23 @@ describe('funil → venda efetuada → faturamento → dashboard', () => {
     await agent.put('/api/settings').send({ cardFeeRate: 0.19 }).expect(200);
   });
 
+  it('conta pessoal: despesa recorrente, dívida, retirada e visão geral (separada da empresa)', async () => {
+    const before = (await agent.get('/api/dashboard?month=2026-10').expect(200)).body.expenses.total;
+    const e = await agent.post('/api/personal/expenses').send({ name: 'Pensão', amount: 2000, dueDate: '2026-10-09', recurrence: { day: 9, startMonth: '2026-10', endMonth: '2027-03' } }).expect(201);
+    expect(e.body.seriesCount).toBe(6);
+    const d = await agent.post('/api/personal/debts').send({ name: 'Empréstimo', creditor: 'Banco', totalAmount: 3000, installments: 3, dueDay: 15, startMonth: '2026-10' }).expect(201);
+    await agent.put('/api/personal/months/2026-10').send({ withdrawal: 10000, applyForward: true }).expect(200);
+    const inst = await agent.get('/api/personal/debt-installments?month=2026-10').expect(200);
+    await agent.patch(`/api/personal/debt-installments/${inst.body[0].id}/pay`).send({}).expect(200);
+    const ov = await agent.get('/api/personal/overview?year=2026').expect(200);
+    expect(ov.body.months[9]).toMatchObject({ withdrawal: 1_000_000, expensesTotal: 200_000, debtsTotal: 100_000, debtsPaid: 100_000, saving: 700_000 });
+    expect(ov.body.months[11].withdrawal).toBe(1_000_000);
+    expect((await agent.get(`/api/personal/debts/${d.body.id}`).expect(200)).body).toMatchObject({ paidCount: 1, remainingAmount: '2000.00' });
+    // a empresa não muda
+    expect((await agent.get('/api/dashboard?month=2026-10').expect(200)).body.expenses.total).toBe(before);
+    await agent.delete(`/api/personal/debts/${d.body.id}`).expect(204);
+  });
+
   it('logout encerra a sessão', async () => {
     await agent.post('/api/auth/logout').expect(204);
     await agent.get('/api/dashboard').expect(401);

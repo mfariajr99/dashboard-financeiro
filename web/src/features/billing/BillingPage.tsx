@@ -105,7 +105,7 @@ function ReceivablesList({ month }: { month: string }) {
                 <p className="truncate font-medium text-ink-title hover:text-accent">{r.client}</p>
                 <p className="label truncate">
                   {METHOD_LABEL[r.paymentMethod]}
-                  {r.installmentCount > 1 ? ` · parcela ${r.installmentNumber}/${r.installmentCount}` : ''}
+                  {r.installmentCount > 1 ? ` · ${r.seriesId ? 'recorrente' : 'parcela'} ${r.installmentNumber}/${r.installmentCount}` : ''}
                   {r.saleId ? '' : ' · avulsa'}
                   {Number(r.feeAmount) > 0 ? ` · bruto ${brl$(r.grossAmount)}` : ''}
                 </p>

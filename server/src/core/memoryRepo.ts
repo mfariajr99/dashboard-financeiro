@@ -3,7 +3,7 @@
  * `onChange` permite persistir o estado (ex.: localStorage) após cada gravação.
  */
 import type { NewRow, Repo, Table } from './repo';
-import { DEFAULT_SETTINGS, type Expense, type Goal, type Opportunity, type Receivable, type Sale, type Settings } from './types';
+import { DEFAULT_SETTINGS, type DebtInstallment, type Expense, type Goal, type Opportunity, type PersonalDebt, type PersonalExpense, type PersonalMonth, type Receivable, type Sale, type Settings } from './types';
 
 export interface MemoryState {
   opportunities: Opportunity[];
@@ -11,12 +11,17 @@ export interface MemoryState {
   receivables: Receivable[];
   expenses: Expense[];
   goals: Goal[];
+  // Conta pessoal (podem faltar em dados salvos por versões anteriores)
+  personalExpenses?: PersonalExpense[];
+  personalDebts?: PersonalDebt[];
+  debtInstallments?: DebtInstallment[];
+  personalMonths?: PersonalMonth[];
   settings: Settings;
   audit: { at: string; action: string; entity: string; entityId: string | null }[];
 }
 
 export function emptyState(): MemoryState {
-  return { opportunities: [], sales: [], receivables: [], expenses: [], goals: [], settings: { ...DEFAULT_SETTINGS }, audit: [] };
+  return { opportunities: [], sales: [], receivables: [], expenses: [], goals: [], personalExpenses: [], personalDebts: [], debtInstallments: [], personalMonths: [], settings: { ...DEFAULT_SETTINGS }, audit: [] };
 }
 
 export function newId(): string {
@@ -31,7 +36,7 @@ export function newId(): string {
   });
 }
 
-type Key = 'opportunities' | 'sales' | 'receivables' | 'expenses' | 'goals';
+type Key = 'opportunities' | 'sales' | 'receivables' | 'expenses' | 'goals' | 'personalExpenses' | 'personalDebts' | 'debtInstallments' | 'personalMonths';
 
 export class MemoryRepo implements Repo {
   constructor(
@@ -40,7 +45,7 @@ export class MemoryRepo implements Repo {
   ) {}
 
   private table<T extends { id: string; createdAt: string; updatedAt: string }>(key: Key): Table<T> {
-    const rows = () => this.state[key] as unknown as T[];
+    const rows = () => (this.state[key] ??= []) as unknown as T[];
     const clone = <X>(x: X): X => JSON.parse(JSON.stringify(x));
     return {
       all: async () => clone(rows()),
@@ -76,6 +81,10 @@ export class MemoryRepo implements Repo {
   receivables = this.table<Receivable>('receivables');
   expenses = this.table<Expense>('expenses');
   goals = this.table<Goal>('goals');
+  personalExpenses = this.table<PersonalExpense>('personalExpenses');
+  personalDebts = this.table<PersonalDebt>('personalDebts');
+  debtInstallments = this.table<DebtInstallment>('debtInstallments');
+  personalMonths = this.table<PersonalMonth>('personalMonths');
 
   private depth = 0;
   private changed() {

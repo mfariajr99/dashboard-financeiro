@@ -1,6 +1,7 @@
-import { CheckCircle2, FileText, Repeat, User } from 'lucide-react';
+import { CheckCircle2, FileText, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { installmentPlan, monthsInclusive, recurrenceFromDates, recurringDates } from '../../../../server/src/core/calc';
+import { installmentPlan, mergeReceived, monthsInclusive, recurrenceFromDates, recurringDates, type MergedPlanItem } from '../../../../server/src/core/calc';
+import { defaultRecurrence, RecurrenceFields } from '../../components/ui/RecurrenceFields';
 import { Field, Input, Select, Textarea } from '../../components/ui/form';
 import { Modal, useConfirm } from '../../components/ui/modal';
 import { MoneyInput } from '../../components/ui/MoneyInput';
@@ -72,7 +73,8 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
       setBoletoMode(rec ? 'RECORRENTE' : 'UNICA');
       if (rec) {
         // na recorrente o valor digitado é o de cada boleto (mensal)
-        setGross(Math.round((Number(s.grossAmount) * 100) / s.installments) / 100);
+        const unitFrom = s.receivables.find((r) => r.status !== 'RECEBIDO') ?? s.receivables[0];
+        setGross(unitFrom ? Number(unitFrom.grossAmount) : Math.round((Number(s.grossAmount) * 100) / s.installments) / 100);
         setRecDay(rec.day);
         setRecStart(rec.startMonth);
         setRecEnd(rec.endMonth);
@@ -106,9 +108,10 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
     if (bm === 'UNICA') setInstallments(1);
     else {
       // sugestão: mesmo dia do 1º vencimento, começando no mês dele, por 12 meses
-      setRecDay(Number(firstDate.slice(8, 10)) || 10);
-      setRecStart(monthOf(firstDate));
-      setRecEnd(addMonths(monthOf(firstDate), 11));
+      const r = defaultRecurrence(firstDate);
+      setRecDay(r.day);
+      setRecStart(r.startMonth);
+      setRecEnd(r.endMonth);
     }
   };
 
@@ -116,15 +119,32 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
   const recCount = recurring ? monthsInclusive(recStart, recEnd) : 0;
   const recDates = useMemo(() => (recurring ? recurringDates(recDay, recStart, recEnd) : []), [recurring, recDay, recStart, recEnd]);
   const unitCents = Math.round((gross ?? 0) * 100);
-  const grossCents = recurring ? unitCents * recDates.length : unitCents; // venda total (entra na meta)
+  // Edição: parcelas já recebidas ficam como estão (mesma regra do servidor: mergeReceived)
+  const received = useMemo(
+    () =>
+      mode?.kind === 'edit'
+        ? mode.sale.receivables.filter((r) => r.status === 'RECEBIDO').map((r) => ({ id: r.id, dueDate: r.dueDate, gross: Math.round(Number(r.grossAmount) * 100), fee: Math.round(Number(r.feeAmount) * 100) }))
+        : [],
+    [mode],
+  );
+  // taxa só no cartão; na edição de venda já no cartão, mantém a taxa histórica
+  const saleRate = method !== 'CARTAO' ? 0 : mode?.kind === 'edit' && mode.sale.paymentMethod === 'CARTAO' ? Number(mode.sale.feeRate) : rate;
+  // Recorrente: os meses já recebidos mantêm o valor; os demais usam o novo valor mensal.
+  const recReceived = recurring ? received.filter((r) => recDates.includes(r.dueDate)) : [];
+  const grossCents = recurring
+    ? recReceived.reduce((a, r) => a + r.gross, 0) + unitCents * (recDates.length - recReceived.length)
+    : unitCents; // venda total (entra na meta)
   const count = recurring ? recDates.length : method === 'BOLETO' ? 1 : installments;
 
-  const plan = useMemo(() => {
+  const basePlan = useMemo(() => {
     if (!gross || gross <= 0) return [];
-    if (recurring) return recDates.length ? installmentPlan({ gross: grossCents, method, cardRate: rate, count: recDates.length, firstDate: recDates[0], dates: recDates }) : [];
+    if (recurring) return recDates.length ? installmentPlan({ gross: grossCents, method, cardRate: saleRate, count: recDates.length, firstDate: recDates[0], dates: recDates }) : [];
     if (!firstDate) return [];
-    return installmentPlan({ gross: grossCents, method, cardRate: rate, count, firstDate, dates });
-  }, [gross, recurring, recDates, grossCents, method, rate, count, firstDate, dates]);
+    return installmentPlan({ gross: grossCents, method, cardRate: saleRate, count, firstDate, dates });
+  }, [gross, recurring, recDates, grossCents, method, saleRate, count, firstDate, dates]);
+  const merged = useMemo(() => (received.length && basePlan.length ? mergeReceived({ plan: basePlan, total: grossCents, rate: saleRate, received }) : null), [received, basePlan, grossCents, saleRate]);
+  const plan: MergedPlanItem[] = merged && 'items' in merged ? merged.items : basePlan;
+  const mergeError = merged && 'error' in merged ? merged.error : null;
   const totals = plan.reduce((a, p) => ({ fee: a.fee + p.fee, net: a.net + p.net }), { fee: 0, net: 0 });
 
   const save = useFinMutation(
@@ -139,6 +159,7 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
 
   const submit = async () => {
     if (!client.trim()) return setError('Informe o cliente');
+    if (mergeError) return setError(mergeError);
     if (!gross || gross <= 0) return setError('Informe o valor da venda');
     if (recurring && recCount < 1) return setError('O mês de fim deve ser igual ou depois do mês de início');
     if (recurring && recCount > 60) return setError('A cobrança recorrente pode ter no máximo 60 meses');
@@ -210,35 +231,18 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
         )}
         {recurring ? (
           <>
-            <Field label="Dia do vencimento" htmlFor="v-rday" hint="Em meses mais curtos, vence no último dia">
-              <Select id="v-rday" value={recDay} onChange={(e) => setRecDay(Number(e.target.value))}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Todo dia {d}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Mês de início" htmlFor="v-rstart">
-                <Select id="v-rstart" value={recStart} onChange={(e) => { setRecStart(e.target.value); if (e.target.value > recEnd) setRecEnd(e.target.value); }}>
-                  {monthOptions(today, recStart).map((m) => (
-                    <option key={m} value={m}>{monthLabel(m, true)}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Mês de fim" htmlFor="v-rend">
-                <Select id="v-rend" value={recEnd} onChange={(e) => setRecEnd(e.target.value)}>
-                  {monthOptions(today, recEnd).filter((m) => m >= recStart).map((m) => (
-                    <option key={m} value={m}>{monthLabel(m, true)}</option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-            <p className="label -mt-2 flex items-center gap-1.5 sm:col-span-2">
-              <Repeat className="h-3.5 w-3.5" />
-              {recCount} cobrança(s) mensal(is) de {brlC(unitCents)} · venda total {brlC(grossCents)}
-            </p>
+            <RecurrenceFields
+              idPrefix="v"
+              today={today}
+              unitCents={unitCents}
+              unitLabel="boleto"
+              value={{ day: recDay, startMonth: recStart, endMonth: recEnd }}
+              onChange={(r) => {
+                setRecDay(r.day);
+                setRecStart(r.startMonth);
+                setRecEnd(r.endMonth);
+              }}
+            />
           </>
         ) : (
           <>
@@ -283,8 +287,12 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
             {plan.map((p, i) => (
               <li key={p.number} className="flex items-center justify-between gap-3 py-2">
                 <span className="w-14 shrink-0 text-[12.5px] text-ink-muted">{p.number}/{plan.length}</span>
-                {recurring ? (
-                  <span className="flex-1 text-[13px] text-ink-body">{dateBR(p.dueDate)} · {monthLabel(p.dueDate.slice(0, 7), true)}</span>
+                {recurring || p.receivedId ? (
+                  <span className="flex flex-1 items-center gap-2 text-[13px] text-ink-body">
+                    {dateBR(p.dueDate)}
+                    {recurring && ` · ${monthLabel(p.dueDate.slice(0, 7), true)}`}
+                    {p.receivedId && <span className="rounded-full bg-[#10B981]/15 px-2 py-0.5 text-[11px] font-semibold text-[#34D399]">Recebida</span>}
+                  </span>
                 ) : (
                 <input
                   type="date"
@@ -302,6 +310,11 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
               </li>
             ))}
           </ul>
+        )}
+        {received.length > 0 && (
+          <p className={`mt-1 text-[11.5px] ${mergeError ? 'text-[#FCA5A5]' : 'italic text-ink-faint'}`}>
+            {mergeError ?? `${received.length} parcela(s) já recebida(s) ficam como estão; o restante do valor vai para as parcelas em aberto.`}
+          </p>
         )}
         {plan.length > 0 && (
           <p className="mt-1 text-[11.5px] italic text-ink-faint">
@@ -322,10 +335,3 @@ export function SaleDialog({ mode, onClose }: { mode: SaleDialogMode | null; onC
   );
 }
 
-/** Meses para escolher início/fim: 12 meses atrás até 5 anos à frente (inclui o valor atual). */
-function monthOptions(today: string, current: string): string[] {
-  const base = addMonths(monthOf(today), -12);
-  const list = Array.from({ length: 12 + 61 }, (_, i) => addMonths(base, i));
-  if (!list.includes(current)) list.push(current);
-  return list.sort();
-}

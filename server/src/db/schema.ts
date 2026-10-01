@@ -101,9 +101,11 @@ export const receivables = pgTable(
     status: receivableStatusEnum('status').notNull().default('A_RECEBER'),
     receivedDate: day('received_date'),
     notes: text('notes'),
+    /** Receita avulsa recorrente: todas as receitas da mesma recorrência têm o mesmo id. */
+    seriesId: text('series_id'),
     ...stamps,
   },
-  (t) => [index('receivables_due_idx').on(t.dueDate), index('receivables_sale_idx').on(t.saleId)],
+  (t) => [index('receivables_due_idx').on(t.dueDate), index('receivables_sale_idx').on(t.saleId), index('receivables_series_idx').on(t.seriesId)],
 );
 
 export const expenses = pgTable(
@@ -131,6 +133,65 @@ export const goals = pgTable('goals', {
   month: text('month').notNull().unique(),
   salesGoal: money('sales_goal').notNull().default('0'),
   billingGoal: money('billing_goal').notNull().default('0'),
+  ...stamps,
+});
+
+// ================================================================== CONTA PESSOAL
+// Separada do dashboard da empresa: nenhuma destas tabelas entra nos cálculos da empresa.
+export const personalExpenses = pgTable(
+  'personal_expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    category: text('category'),
+    supplier: text('supplier'),
+    amount: money('amount').notNull(),
+    dueDate: day('due_date').notNull(),
+    status: expenseStatusEnum('status').notNull().default('PENDENTE'),
+    paidDate: day('paid_date'),
+    seriesId: text('series_id'),
+    seriesIndex: integer('series_index'),
+    seriesCount: integer('series_count'),
+    notes: text('notes'),
+    ...stamps,
+  },
+  (t) => [index('personal_expenses_due_idx').on(t.dueDate), index('personal_expenses_series_idx').on(t.seriesId)],
+);
+
+export const personalDebts = pgTable('personal_debts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  creditor: text('creditor'),
+  totalAmount: money('total_amount').notNull(),
+  installments: integer('installments').notNull().default(1),
+  dueDay: integer('due_day').notNull(),
+  startMonth: text('start_month').notNull(),
+  notes: text('notes'),
+  ...stamps,
+});
+
+export const debtInstallments = pgTable(
+  'debt_installments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    debtId: uuid('debt_id')
+      .notNull()
+      .references(() => personalDebts.id, { onDelete: 'cascade' }),
+    number: integer('number').notNull(),
+    count: integer('count').notNull(),
+    amount: money('amount').notNull(),
+    dueDate: day('due_date').notNull(),
+    status: expenseStatusEnum('status').notNull().default('PENDENTE'),
+    paidDate: day('paid_date'),
+    ...stamps,
+  },
+  (t) => [index('debt_installments_due_idx').on(t.dueDate), index('debt_installments_debt_idx').on(t.debtId)],
+);
+
+export const personalMonths = pgTable('personal_months', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  month: text('month').notNull().unique(),
+  withdrawal: money('withdrawal').notNull().default('0'),
   ...stamps,
 });
 

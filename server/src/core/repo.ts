@@ -2,7 +2,7 @@
  * Contrato de persistência. O servidor implementa com Drizzle/PostgreSQL; o ambiente de teste
  * implementa em memória (localStorage). Toda a regra de negócio (services.ts) usa só esta interface.
  */
-import type { Expense, Goal, Opportunity, Receivable, Sale, Settings } from './types';
+import type { DebtInstallment, Expense, Goal, Opportunity, PersonalDebt, PersonalExpense, PersonalMonth, Receivable, Sale, Settings } from './types';
 
 type Row = { id: string };
 export type NewRow<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt'>;
@@ -21,6 +21,11 @@ export interface Repo {
   receivables: Table<Receivable>;
   expenses: Table<Expense>;
   goals: Table<Goal>;
+  // Conta pessoal (separada da empresa)
+  personalExpenses: Table<PersonalExpense>;
+  personalDebts: Table<PersonalDebt>;
+  debtInstallments: Table<DebtInstallment>;
+  personalMonths: Table<PersonalMonth>;
   getSettings(): Promise<Settings>;
   saveSettings(s: Settings): Promise<Settings>;
   audit(action: string, entity: string, entityId?: string | null): Promise<void>;

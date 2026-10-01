@@ -51,6 +51,44 @@ export function installmentPlan(p: { gross: Cents; method: PaymentMethod; cardRa
   }));
 }
 
+export interface MergedPlanItem extends InstallmentPlanItem {
+  /** id da parcela já recebida que ocupa esta posição (mantida como está). */
+  receivedId?: string;
+}
+
+/**
+ * Reprograma uma venda que já tem parcelas recebidas. As recebidas ficam como estão (data e valor);
+ * elas precisam ter a mesma data no novo plano. O restante do novo total (total − recebido) é
+ * dividido entre as demais parcelas, com a taxa do cartão sobre esse restante.
+ */
+export function mergeReceived(p: {
+  plan: InstallmentPlanItem[];
+  total: Cents;
+  rate: number;
+  received: { id: string; dueDate: ISODate; gross: Cents; fee: Cents }[];
+}): { items: MergedPlanItem[] } | { error: string } {
+  const taken = new Map<number, (typeof p.received)[number]>();
+  for (const r of p.received) {
+    const idx = p.plan.findIndex((x, i) => !taken.has(i) && x.dueDate === r.dueDate);
+    if (idx < 0) return { error: `A parcela de ${r.dueDate.split('-').reverse().join('/')} já foi recebida e precisa continuar no plano (mesma data). Desfaça o recebimento para mudá-la.` };
+    taken.set(idx, r);
+  }
+  const receivedGross = p.received.reduce((a, r) => a + r.gross, 0);
+  const remaining = p.total - receivedGross;
+  const open = p.plan.map((_, i) => i).filter((i) => !taken.has(i));
+  if (remaining < 0) return { error: `O valor total não pode ser menor que o já recebido (${(receivedGross / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).` };
+  if (open.length === 0 && remaining !== 0) return { error: 'Todas as parcelas já foram recebidas. Para corrigir o valor, edite a parcela no Faturamento.' };
+  const grossParts = splitCents(remaining, Math.max(1, open.length));
+  const feeParts = splitCents(computeFee(remaining, p.rate).feeCents, Math.max(1, open.length));
+  const items = p.plan.map((x, i): MergedPlanItem => {
+    const r = taken.get(i);
+    if (r) return { number: i + 1, dueDate: x.dueDate, gross: r.gross, fee: r.fee, net: r.gross - r.fee, receivedId: r.id };
+    const k = open.indexOf(i);
+    return { number: i + 1, dueDate: x.dueDate, gross: grossParts[k], fee: feeParts[k], net: grossParts[k] - feeParts[k] };
+  });
+  return { items };
+}
+
 /** Quantos meses entre início e fim (inclusive). 0 se o fim for antes do início. */
 export function monthsInclusive(startMonth: MonthKey, endMonth: MonthKey): number {
   const [ys, ms] = startMonth.split('-').map(Number);

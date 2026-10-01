@@ -8,6 +8,20 @@
       "when": 1790815107898,
       "tag": "0000_init_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790820069439,
+      "tag": "0001_receivable_series",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790821398627,
+      "tag": "0002_conta_pessoal",
+      "breakpoints": true
     }
   ]
 }
