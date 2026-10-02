@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { AppShell } from './components/layout/AppShell';
+import { AppShell, FunilVendasPage } from './components/layout/AppShell';
 import { QuickActionsProvider } from './components/layout/QuickActions';
 import { ConfirmProvider } from './components/ui/modal';
 import { Skeleton } from './components/ui/primitives';
@@ -14,7 +14,6 @@ const BillingPage = lazy(() => import('./features/billing/BillingPage'));
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage'));
 const GoalsPage = lazy(() => import('./features/goals/GoalsPage'));
 const CalendarPage = lazy(() => import('./features/calendar/CalendarPage'));
-const FunilVendasPage = lazy(() => import('./features/funil-vendas/FunilVendasPage'));
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage'));
 
 function PageFallback() {
