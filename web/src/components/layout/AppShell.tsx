@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { CalendarDays, ChevronDown, FilePlus2, FileSearch, Flame, Headset, History, Presentation, type LucideIcon, Goal, LayoutDashboard, LogOut, Menu, Plus, Receipt, Settings, ShoppingCart, Target, Wallet, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, FilePlus2, FileSearch, Flame, Headset, History, Presentation, type LucideIcon, Goal, LayoutDashboard, LogOut, Menu, MonitorPlay, Plus, Receipt, Settings, ShoppingCart, Target, Wallet, X } from 'lucide-react';
 import { Brand } from './Brand';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ export const FUNIL_VIEWS: { slug: string; view: string; label: string; icon: Luc
   { slug: 'historico', view: 'callsHistory', label: 'Histórico de Calls', icon: History },
   { slug: 'criar-proposta', view: 'propostaForm', label: 'Criar Proposta', icon: FilePlus2 },
   { slug: 'propostas', view: 'propostasList', label: 'Consultar Propostas', icon: FileSearch },
+  { slug: 'apresentacoes', view: 'apresentacoesList', label: 'Apresentações', icon: MonitorPlay },
 ];
 
 export const FUNIL_BASE = '/vendas';

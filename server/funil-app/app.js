@@ -33,6 +33,7 @@ let apiIsAvailable = true;
 let _callsCache = [];
 let _propostasCache = [];
 let _diagnosticosCache = [];
+let _apresentacoesCache = [];
 
 function renderStorageWarningBanner(){
   if(apiIsAvailable) return '';
@@ -59,6 +60,7 @@ async function apiRequest(method, path, body){
     if(res.status === 401 || res.status === 403){ sessionExpired(); return null; }
     if(!res.ok) throw new Error('HTTP ' + res.status);
     apiIsAvailable = true;
+    if(method !== 'GET') funilNotifyChange();
     return await res.json();
   } catch(e){
     console.error('Falha de comunicação com o servidor:', e);
@@ -77,6 +79,7 @@ async function bootstrapData(){
     _callsCache = data.calls || [];
     _propostasCache = data.propostas || [];
     _diagnosticosCache = data.diagnosticos || [];
+    _apresentacoesCache = data.apresentacoes || [];
     if(data.operator && data.operator.name) OPERATOR_NAME = data.operator.name;
     apiIsAvailable = true;
   } catch(e){
@@ -150,6 +153,26 @@ function deleteProposta(id){
   apiRequest('DELETE', '/api/funil/propostas/' + encodeURIComponent(id));
 }
 
+/* ---------------- Apresentações (telas enviadas em PNG) ---------------- */
+function loadApresentacoes(){
+  return _apresentacoesCache;
+}
+function addApresentacao(a){
+  _apresentacoesCache.push(a);
+  apiRequest('POST', '/api/funil/apresentacoes', a);
+}
+function updateApresentacao(id, patch){
+  const idx = _apresentacoesCache.findIndex(a => a.id === id);
+  if(idx > -1){
+    _apresentacoesCache[idx] = Object.assign({}, _apresentacoesCache[idx], patch);
+    apiRequest('PUT', '/api/funil/apresentacoes/' + encodeURIComponent(id), patch);
+  }
+}
+function deleteApresentacao(id){
+  _apresentacoesCache = _apresentacoesCache.filter(a => a.id !== id);
+  apiRequest('DELETE', '/api/funil/apresentacoes/' + encodeURIComponent(id));
+}
+
 function saveCurrentDiagnostic(){
   addDiagnosticRecord({
     id: 'd_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
@@ -175,7 +198,7 @@ function saveCurrentDiagnostic(){
 }
 
 /* ---------------- App-level state (login / dashboard / wizard / history) ---------------- */
-const FUNIL_NAV_VIEWS = ['dashboard','callForm','callsHistory','propostaForm','propostasList'];
+const FUNIL_NAV_VIEWS = ['dashboard','callForm','callsHistory','propostaForm','propostasList','apresentacoesList'];
 let appState = {
   view: (function(){
     const v = (location.hash || '').replace('#','');
@@ -245,6 +268,7 @@ function goToDashboard(){
 /* ---------------- Apresentação da solução (presenter-driven, sem IA) ---------------- */
 function startPresentation(){
   const overlay = document.getElementById('loadingOverlay');
+  if(overlay.style.display === 'flex') return; /* evita iniciar duas vezes (toque duplo) */
   const textEl = document.getElementById('loadingText');
   const fill = document.getElementById('loadingBarFill');
   const messages = ['Compilando dados','Avaliando','Processando dados','Gerando apresentação'];
@@ -290,17 +314,24 @@ function presentationSlides(){
   const objetivosText = (state.objetivos && state.objetivos.length) ? state.objetivos.join(', ') : 'Objetivos do diagnóstico';
   const slide3Image = state.customSlide3Image || PRES_IMAGES.slide3;
   const relData = buildRelatorioData();
+  /* Telas da apresentação escolhida na call; sem escolha, as telas padrão Club'n. */
+  const apres = state.selectedApresentacao;
+  const middle = (apres && apres.telas && apres.telas.length)
+    ? apres.telas.map(img => ({ image: img }))
+    : [
+      { image: PRES_IMAGES.slide2 },
+      { image: slide3Image },
+      { image: PRES_IMAGES.slide4 },
+      { image: PRES_IMAGES.slide5 },
+      { image: PRES_IMAGES.slide6 },
+      { image: PRES_IMAGES.slide7 },
+      { image: PRES_IMAGES.slide8, nextLabel:'Faz sentido!' },
+      { image: PRES_IMAGES.slideProposito },
+      { image: PRES_IMAGES.slide9 }
+    ];
   const slides = [
     { type:'slide1custom', objetivosText, pctTotal: relData.pctTotal, novasIndicacoes: relData.novasIndicacoes },
-    { image: PRES_IMAGES.slide2 },
-    { image: slide3Image },
-    { image: PRES_IMAGES.slide4 },
-    { image: PRES_IMAGES.slide5 },
-    { image: PRES_IMAGES.slide6 },
-    { image: PRES_IMAGES.slide7 },
-    { image: PRES_IMAGES.slide8, nextLabel:'Faz sentido!' },
-    { image: PRES_IMAGES.slideProposito },
-    { image: PRES_IMAGES.slide9 },
+    ...middle,
     { type:'resultado',
       nomeCliente: state.nomeCliente,
       nomeEmpresa: state.nomeEmpresa,
@@ -456,6 +487,7 @@ function startNewDiagnostic(profileId){
 function startCallDiagnostic(profileId){
   const call = loadCalls().find(c => c.id === appState.activeCallId);
   updateCall(appState.activeCallId, {status:'em_andamento'});
+  if(call) document.title = 'Call · ' + (call.nomeEmpresa || call.nomeCliente || 'Funil de Vendas');
   const allPropostas = loadPropostas();
   const selectedPropostas = call && call.propostasSelecionadas && call.propostasSelecionadas.length
     ? allPropostas.filter(p => call.propostasSelecionadas.includes(p.id))
@@ -472,6 +504,7 @@ function startCallDiagnostic(profileId){
     giftbackValor:100, compraMinima:300, dor1Stage:'narrative',
     customSlide3Image: call && call.slide3ImageDataUrl ? call.slide3ImageDataUrl : null,
     selectedPropostas,
+    selectedApresentacao: call && call.apresentacaoId ? (loadApresentacoes().find(a => a.id === call.apresentacaoId) || null) : null,
     chat: { transcript: [], fieldIndex: 1, awaitingConfirm:false, typing:false, multiSelectBuffer:[], noClientsBranch:false, dor1ChatStage:null, meetingStage:'narrating' }
   };
   appState.view = 'wizard';
@@ -572,6 +605,7 @@ function submitMeetingTicketMedio(rawValue){
 
 function runMeetingLoading(onDone){
   const overlay = document.getElementById('loadingOverlay');
+  if(overlay.style.display === 'flex') return; /* evita iniciar duas vezes (toque duplo) */
   const textEl = document.getElementById('loadingText');
   const fill = document.getElementById('loadingBarFill');
   const messages = ['Avaliando','Processando dados','Gerando diagnóstico'];
@@ -803,6 +837,9 @@ function parseBRNumber(str){
     s = s.replace(/\./g,'').replace(',', '.');
   } else if(s.includes(',')){
     s = s.replace(',', '.');
+  } else if(/^\d{1,3}(\.\d{3})+$/.test(s)){
+    /* "15.000" / "1.500.000": ponto como separador de milhar (padrão brasileiro) */
+    s = s.replace(/\./g,'');
   }
   const v = parseFloat(s);
   return isNaN(v) ? 0 : v;
@@ -1171,6 +1208,15 @@ function render(){
   } else if(appState.view === 'presentation'){
     setStepper(-1);
     p.innerHTML = renderPresentation();
+  } else if(appState.view === 'apresentacoesList'){
+    setStepper(-1);
+    p.innerHTML = renderApresentacoesList();
+  } else if(appState.view === 'apresentacaoForm'){
+    setStepper(-1);
+    p.innerHTML = renderApresentacaoForm();
+  } else if(appState.view === 'callDone'){
+    setStepper(-1);
+    p.innerHTML = renderCallDone();
   } else {
     // wizard
     setStepper(state.step);
@@ -1289,6 +1335,20 @@ function renderCrmShell(active, innerHtml){
   `;
 }
 
+function renderApresentacaoChoice(name, selectedId){
+  const list = loadApresentacoes();
+  const opt = (id, label, sub) => `
+    <label class="crmd-checkbox-item">
+      <input type="radio" name="${name}" class="${name}" value="${id}" ${(selectedId||'') === id ? 'checked' : ''}>
+      <span>${escapeHtml(label)} <span class="val">${escapeHtml(sub)}</span></span>
+    </label>`;
+  return `<div class="crmd-checkbox-list">
+    ${opt('', "Padrão Club'n", 'telas padrão')}
+    ${list.map(a => opt(a.id, a.nome, (a.telas||[]).length + ' tela' + ((a.telas||[]).length === 1 ? '' : 's'))).join('')}
+  </div>
+  ${list.length === 0 ? `<p class="crmd-hint" style="margin-top:8px;">Crie apresentações próprias em "Apresentações".</p>` : ''}`;
+}
+
 function renderCallForm(){
   const propostas = loadPropostas();
   const propostasHtml = propostas.length === 0
@@ -1335,6 +1395,10 @@ function renderCallForm(){
         <input type="file" id="callSlide3Image" accept="image/*">
         <div class="crmd-hint" id="callSlide3ImageStatus"></div>
       </div>
+
+      <div class="crmd-section-title">${crmIcon('image')} Apresentação para esta call</div>
+      <p class="crmd-hint" style="margin-bottom:12px;">As telas entram depois de "Vamos começar lembrando os seus objetivos" e antes de "Qual resultado esperado?".</p>
+      ${renderApresentacaoChoice('call-apres', '')}
 
       <div class="crmd-section-title">${crmIcon('file-spreadsheet')} Propostas para esta call (opcional)</div>
       <p class="crmd-hint" style="margin-bottom:12px;">As telas das propostas marcadas entram na apresentação, logo após "Qual resultado esperado?".</p>
@@ -1449,6 +1513,145 @@ function renderPropostasList(){
   return renderCrmShell('propostasList', content);
 }
 
+
+/* ---------------- Apresentações: listar / criar / editar ---------------- */
+let editingApresId = null;
+let pendingApresTelas = null; /* array de dataURLs enquanto edita */
+
+function renderApresentacoesList(){
+  const list = loadApresentacoes();
+  const rows = list.map(a => {
+    const telas = a.telas || [];
+    return `
+    <div class="crmd-proposta-card" data-edit-apres="${a.id}">
+      <div class="crmd-proposta-thumbs">
+        ${telas.slice(0,3).map((t,i) => `<img src="${t}" alt="Tela ${i+1}">`).join('') || `<div class="crmd-proposta-thumb-empty">—</div>`}
+      </div>
+      <div class="crmd-proposta-info">
+        <div class="crmd-proposta-name">${escapeHtml(a.nome)}</div>
+        <div class="crmd-proposta-valor">${telas.length} tela${telas.length === 1 ? '' : 's'}</div>
+      </div>
+      <button class="crmd-btn-ghost" style="padding:9px 16px; min-height:0;">${crmIcon('edit3')} Editar</button>
+    </div>`;
+  }).join('');
+  const content = `
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <div>
+        <h1>Apresentações</h1>
+        <p class="sub">Telas (PNG) que entram na call, entre "Vamos começar lembrando os seus objetivos" e "Qual resultado esperado?".</p>
+      </div>
+      <button class="crmd-btn-primary" id="newApresBtn">${crmIcon('plus-circle')} Nova apresentação</button>
+    </div>
+    ${list.length === 0 ? `<div class="crmd-list-card"><div class="crmd-list-empty">Nenhuma apresentação criada ainda. Sem apresentação escolhida, a call usa as telas padrão Club'n.</div></div>` : rows}
+  `;
+  return renderCrmShell('apresentacoesList', content);
+}
+
+function renderApresentacaoForm(){
+  const editing = editingApresId ? loadApresentacoes().find(a => a.id === editingApresId) : null;
+  if(pendingApresTelas === null) pendingApresTelas = editing ? (editing.telas || []).slice() : [];
+  const telas = pendingApresTelas;
+  const thumbs = telas.map((t, i) => `
+    <div class="apres-thumb">
+      <img src="${t}" alt="Tela ${i+1}">
+      <div class="apres-thumb-bar">
+        <span class="apres-thumb-num">${i+1}</span>
+        <button type="button" class="apres-thumb-btn" data-apres-move="${i}" data-dir="-1" ${i===0?'disabled':''} aria-label="Mover para antes">←</button>
+        <button type="button" class="apres-thumb-btn" data-apres-move="${i}" data-dir="1" ${i===telas.length-1?'disabled':''} aria-label="Mover para depois">→</button>
+        <button type="button" class="apres-thumb-btn apres-thumb-del" data-apres-del="${i}" aria-label="Remover tela">✕</button>
+      </div>
+    </div>`).join('');
+  const content = `
+    <a href="#" class="crmd-back-link" id="backFromApresForm">← Apresentações</a>
+    <h1>${editing ? 'Editar apresentação' : 'Nova apresentação'}</h1>
+    <p class="sub">Envie as telas em PNG (16:9) na ordem em que serão apresentadas. Você pode reordenar e remover.</p>
+    <div class="crmd-card">
+      <div class="crmd-field">
+        <label>${crmIcon('file-spreadsheet')} Nome da apresentação</label>
+        <input type="text" id="apresNome" placeholder="Ex.: Apresentação Clínicas" value="${escapeHtml(appState.apresDraftNome != null ? appState.apresDraftNome : (editing ? editing.nome : ''))}">
+      </div>
+      <div class="crmd-field">
+        <label>${crmIcon('image')} Telas</label>
+        <input type="file" id="apresTelasInput" accept="image/png,image/*" multiple>
+        <div class="crmd-hint" id="apresStatus">${telas.length ? telas.length + ' tela' + (telas.length===1?'':'s') + ' nesta apresentação.' : 'Nenhuma tela ainda.'}</div>
+      </div>
+      ${telas.length ? `<div class="apres-thumbs">${thumbs}</div>` : ''}
+      <div class="crmd-error" id="apresFormError">Informe o nome e envie ao menos uma tela.</div>
+      <div class="crmd-actions" style="margin-top:22px;${editing ? '' : ' justify-content:flex-end;'}">
+        ${editing ? `<button class="crmd-btn-ghost crmd-btn-danger" id="apresDeleteBtn">${crmIcon('trash2')} Excluir</button>` : ''}
+        <button class="crmd-btn-primary" id="apresSaveBtn">Salvar apresentação</button>
+      </div>
+    </div>
+  `;
+  return renderCrmShell('apresentacoesList', content);
+}
+
+function attachApresentacoesHandlers(){
+  if(appState.view === 'apresentacoesList'){
+    const nb = document.getElementById('newApresBtn');
+    if(nb) nb.onclick = ()=>{ editingApresId = null; pendingApresTelas = null; appState.apresDraftNome = null; appState.view = 'apresentacaoForm'; render(); };
+    document.querySelectorAll('[data-edit-apres]').forEach(card=>{
+      card.onclick = ()=>{ editingApresId = card.getAttribute('data-edit-apres'); pendingApresTelas = null; appState.apresDraftNome = null; appState.view = 'apresentacaoForm'; render(); };
+    });
+    return true;
+  }
+  if(appState.view !== 'apresentacaoForm') return false;
+  const keepName = ()=>{ const n = document.getElementById('apresNome'); if(n) appState.apresDraftNome = n.value; };
+  const rerender = ()=>{ keepName(); render(); };
+  const back = document.getElementById('backFromApresForm');
+  if(back) back.onclick = (e)=>{ e.preventDefault(); editingApresId = null; pendingApresTelas = null; appState.view = 'apresentacoesList'; render(); };
+  const input = document.getElementById('apresTelasInput');
+  if(input) input.onchange = (e)=>{
+    const files = Array.from(e.target.files || []);
+    if(!files.length) return;
+    const status = document.getElementById('apresStatus');
+    if(status) status.textContent = 'Carregando ' + files.length + ' tela' + (files.length===1?'':'s') + '...';
+    const out = new Array(files.length);
+    let done = 0;
+    files.forEach((file, idx)=>{
+      compressImageFile(file, 1920, 0.86, (dataUrl)=>{
+        out[idx] = dataUrl;
+        if(++done === files.length){
+          out.filter(Boolean).forEach(d => pendingApresTelas.push(d));
+          rerender();
+        }
+      });
+    });
+  };
+  document.querySelectorAll('[data-apres-move]').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.getAttribute('data-apres-move')), d = Number(b.getAttribute('data-dir'));
+      const j = i + d; if(j < 0 || j >= pendingApresTelas.length) return;
+      const t = pendingApresTelas[i]; pendingApresTelas[i] = pendingApresTelas[j]; pendingApresTelas[j] = t;
+      rerender();
+    };
+  });
+  document.querySelectorAll('[data-apres-del]').forEach(b=>{
+    b.onclick = ()=>{ pendingApresTelas.splice(Number(b.getAttribute('data-apres-del')), 1); rerender(); };
+  });
+  const del = document.getElementById('apresDeleteBtn');
+  if(del) del.onclick = ()=>{
+    if(!confirm('Excluir esta apresentação? As calls que a usam passam a usar as telas padrão.')) return;
+    deleteApresentacao(editingApresId);
+    editingApresId = null; pendingApresTelas = null; appState.view = 'apresentacoesList'; render();
+  };
+  const save = document.getElementById('apresSaveBtn');
+  if(save) save.onclick = ()=>{
+    const nome = document.getElementById('apresNome').value.trim();
+    const err = document.getElementById('apresFormError');
+    if(!nome || !pendingApresTelas.length){ err.textContent = 'Informe o nome e envie ao menos uma tela.'; err.style.display = 'block'; return; }
+    const size = pendingApresTelas.reduce((n, t) => n + t.length, 0);
+    if(size > 28 * 1024 * 1024){ err.textContent = 'As telas somam mais de 28 MB. Use imagens menores ou divida em duas apresentações.'; err.style.display = 'block'; return; }
+    const patch = { nome, telas: pendingApresTelas.slice() };
+    if(editingApresId) updateApresentacao(editingApresId, patch);
+    else addApresentacao(Object.assign({ id: 'apr_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7), createdAt: new Date().toISOString() }, patch));
+    editingApresId = null; pendingApresTelas = null; appState.apresDraftNome = null;
+    appState.view = 'apresentacoesList';
+    render();
+  };
+  return true;
+}
+
 /* ---------------- Histórico de Calls ---------------- */
 function renderCallsHistory(){
   const calls = loadCalls().slice().sort((a,b)=> new Date(b.createdAt||0) - new Date(a.createdAt||0));
@@ -1530,6 +1733,10 @@ function renderCallEditPending(call){
         </div>
       </div>
       <div class="crmd-error" id="editCallError">Preencha ao menos o nome do cliente e da empresa.</div>
+
+      <div class="crmd-section-title">${crmIcon('image')} Apresentação para esta call</div>
+      <p class="crmd-hint" style="margin-bottom:12px;">As telas entram depois de "Vamos começar lembrando os seus objetivos" e antes de "Qual resultado esperado?".</p>
+      ${renderApresentacaoChoice('edit-call-apres', call.apresentacaoId || '')}
 
       <div class="crmd-section-title">${crmIcon('file-spreadsheet')} Propostas para esta call</div>
       <p class="crmd-hint" style="margin-bottom:12px;">As telas das propostas marcadas entram na apresentação, logo após "Qual resultado esperado?".</p>
@@ -1926,6 +2133,7 @@ function renderChatStep(){
     if(m.type==='frente4card') return renderChatFrente4Card(m.data);
     if(m.type==='resumoCard') return renderChatResumoCard(m.data);
     if(m.type==='relatorioCard') return renderChatRelatorioCard(m.data);
+    if(m.type==='pdfdownload') return `<a href="${m.url}" download="${escapeHtml(m.filename)}" class="chat-pdf-link">⬇ ${escapeHtml(m.label)} <span>${escapeHtml(m.filename)}</span></a>`;
     if(m.type==='whatsapplink') return `<a href="${m.url}" target="_blank" rel="noopener noreferrer" class="chat-whatsapp-link">Abrir link do WhatsApp</a>`;
     return `<div class="user-bubble">${m.text}</div>`;
   }).join('');
@@ -2437,6 +2645,7 @@ function submitDor1Whatsapp(rawValue){
   const c = state.chat;
   const digits = String(rawValue).replace(/\D/g,'');
   if(!digits) return;
+  const pdf = generateDor1Pdf(null, `Diagnostico ${state.nomeEmpresa}.pdf`);
   proceedChat(rawValue.trim(), ()=>{
     c.dor1ChatStage = 'narrating';
     state.whatsapp = digits;
@@ -2444,13 +2653,12 @@ function submitDor1Whatsapp(rawValue){
     const msg = `Olá, ${state.nomeCliente}! Aqui é o Marcos da Club'n. Segue o Diagnóstico que preparamos para Crescimento da ${state.nomeEmpresa}`;
     const link = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 
-    generateDor1Pdf(null, `Diagnóstico ${state.nomeEmpresa}.pdf`);
-
     if(appState.activeCallId){
       updateCall(appState.activeCallId, {status:'diagnostico_enviado', diagnosticoEnviadoEm: new Date().toISOString(), whatsapp: digits});
     }
 
     pushAi('Perfeito. Segue o link para encaminhamento:');
+    if(pdf && pdf.url) state.chat.transcript.push({type:'pdfdownload', url: pdf.url, filename: pdf.filename, label: 'Baixar PDF do diagnóstico'});
     state.chat.transcript.push({type:'whatsapplink', url: link});
     render();
     setTimeout(()=>{
@@ -2746,6 +2954,7 @@ function attachHandlers(){
 
   const logoutBtn = document.getElementById('logoutBtn');
   if(logoutBtn) logoutBtn.onclick = logout;
+  if(appState.view === 'callDone'){ attachCallDoneHandlers(); return; }
 
   document.querySelectorAll('[data-nav]').forEach(btn=>{
     btn.onclick = ()=>{
@@ -2778,7 +2987,13 @@ function attachHandlers(){
     });
     document.querySelectorAll('[data-start-call]').forEach(btn=>{
       btn.onclick = ()=>{
-        appState.activeCallId = btn.getAttribute('data-start-call');
+        const callId = btn.getAttribute('data-start-call');
+        /* dentro do Dashboard: a call abre numa aba própria, só com o diagnóstico e a apresentação */
+        if(FUNIL_EMBEDDED){
+          const w = window.open('/funil-app/?call=' + encodeURIComponent(callId), '_blank');
+          if(w) return;
+        }
+        appState.activeCallId = callId;
         appState.view = 'callProfileChoice';
         render();
       };
@@ -2834,6 +3049,7 @@ function attachHandlers(){
           nomeCliente, nomeEmpresa, instagram, dataISO,
           slide3ImageDataUrl: pendingSlide3Image || null,
           propostasSelecionadas,
+          apresentacaoId: (document.querySelector('.call-apres:checked') || {}).value || null,
           status: 'pendente',
           createdAt: new Date().toISOString()
         });
@@ -2919,6 +3135,8 @@ function attachHandlers(){
     return;
   }
 
+  if(attachApresentacoesHandlers()) return;
+
   if(appState.view === 'propostasList'){
     document.querySelectorAll('[data-edit-proposta]').forEach(card=>{
       card.onclick = ()=>{
@@ -2971,7 +3189,8 @@ function attachHandlers(){
         let dataISO = '';
         if(dataVal){ dataISO = dataVal + 'T' + (horaVal || '00:00'); }
         const propostasSelecionadas = Array.from(document.querySelectorAll('.edit-call-proposta-check:checked')).map(el=>el.value);
-        updateCall(appState.editingCallId, {nomeCliente, nomeEmpresa, instagram, dataISO, propostasSelecionadas});
+        const apresentacaoId = (document.querySelector('.edit-call-apres:checked') || {}).value || null;
+        updateCall(appState.editingCallId, {nomeCliente, nomeEmpresa, instagram, dataISO, propostasSelecionadas, apresentacaoId});
         appState.editingCallId = null;
         appState.view = 'callsHistory';
         render();
@@ -3169,6 +3388,26 @@ function attachHandlers(){
 /* PDF conciso e específico para a Dor 1 (Vender mais / Clientes novos):
    nome, empresa, situação atual, indicações, giftback (1º mês + 12 meses)
    e o incremento total em destaque no final. */
+
+/* ---------------- Downloads de PDF ----------------
+   Nome sem acentos (com acento alguns navegadores salvam só "download", sem .pdf)
+   e link guardado para o botão "Baixar PDF" — clique do usuário funciona em qualquer navegador. */
+function funilSafeFilename(name){
+  return String(name || 'arquivo.pdf').normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[\\/:*?"<>|']+/g,'').replace(/\s+/g,' ').trim() || 'arquivo.pdf';
+}
+function funilDownloadBlob(blob, filename){
+  const safe = funilSafeFilename(filename);
+  const url = URL.createObjectURL(blob);
+  try{
+    const link = document.createElement('a');
+    link.href = url; link.download = safe; link.rel = 'noopener'; link.style.display = 'none';
+    document.body.appendChild(link); link.click();
+    setTimeout(()=>{ try{ document.body.removeChild(link); } catch(e){} }, 0);
+  } catch(e){ console.error(e); }
+  return { url, filename: safe };
+}
+
 function imgFormatFromDataUrl(dataUrl){
   if(!dataUrl) return 'JPEG';
   if(dataUrl.indexOf('data:image/png') === 0) return 'PNG';
@@ -3212,11 +3451,9 @@ function generatePropostaPdf(){
     });
 
     const filename = "Club'n Proposta - " + (state.nomeEmpresa || 'cliente') + '.pdf';
-    const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = filename; link.style.display = 'none';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const dl = funilDownloadBlob(doc.output('blob'), filename);
+    appState.lastPropostaPdf = dl;
+    return dl;
   } catch(e){
     console.error(e);
     alert('Não foi possível gerar o PDF da proposta agora.');
@@ -3250,8 +3487,9 @@ function renderPresentationSentStage(){
     <div class="pres2-wrap">
       <div class="pres3-frame pres1-frame">
         <div class="pres-endstage">
-          <h1 class="pres1-heading pres1-heading-upright">PDF da proposta enviado!</h1>
-          <p class="pres-endstage-text">O PDF já foi baixado no seu computador. Envie para o cliente pelo WhatsApp.</p>
+          <h1 class="pres1-heading pres1-heading-upright">PDF da proposta pronto!</h1>
+          <p class="pres-endstage-text">O PDF foi gerado e enviado para a pasta Downloads. Se não aparecer, toque em "Baixar PDF da proposta". Depois, envie para o cliente pelo WhatsApp.</p>
+          ${appState.lastPropostaPdf ? `<a href="${appState.lastPropostaPdf.url}" download="${escapeHtml(appState.lastPropostaPdf.filename)}" class="chat-pdf-link" style="margin-bottom:14px;">⬇ Baixar PDF da proposta <span>${escapeHtml(appState.lastPropostaPdf.filename)}</span></a><br>` : ''}
           ${appState.presentationWaLink
             ? `<a href="${appState.presentationWaLink}" target="_blank" rel="noopener noreferrer" class="chat-whatsapp-link">Abrir link do WhatsApp</a>`
             : `<p class="pres-endstage-text" style="opacity:0.7;">(WhatsApp do cliente não informado nesta call)</p>`}
@@ -3602,15 +3840,14 @@ function generateDor1Pdf(buttonId, filenameOverride){
     drawFooterDisclaimer();
 
     const filename = filenameOverride || ('diagnostico-' + (state.nomeEmpresa || 'clubn').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') + '.pdf');
-    const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = filename; link.style.display = 'none';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const dl = funilDownloadBlob(doc.output('blob'), filename);
+    const url = dl.url;
+    appState.lastDiagnosticoPdf = dl;
     const manualLink = document.getElementById('pdfManualLink');
     if(manualLink){
-      manualLink.href = url; manualLink.download = filename; manualLink.style.display = 'inline-flex';
+      manualLink.href = url; manualLink.download = dl.filename; manualLink.style.display = 'inline-flex';
     }
+    return dl;
   } catch(e){
     console.error(e);
     alert('Não foi possível gerar o PDF agora. Tente novamente.');
@@ -3838,24 +4075,16 @@ function generatePdf(buttonId){
 
     // Build the PDF as a Blob and trigger the download manually (avoids jsPDF's
     // internal browser-detection fallbacks, which can fail inside sandboxed iframes).
-    const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
-
-    // Try an automatic download first.
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const dl = funilDownloadBlob(doc.output('blob'), filename);
+    const url = dl.url;
+    appState.lastDiagnosticoPdf = dl;
 
     // Always also reveal a manual fallback link, in case the automatic
     // download was silently blocked by the browser/iframe sandbox.
     const manualLink = document.getElementById('pdfManualLink');
     if(manualLink){
       manualLink.href = url;
-      manualLink.download = filename;
+      manualLink.download = dl.filename;
       manualLink.style.display = 'inline-flex';
     }
   } catch(e){
@@ -3890,6 +4119,9 @@ function funilNavigate(view){
   pendingPropostaTela1 = null;
   pendingPropostaTela2 = null;
   pendingPropostaTelaOferta = null;
+  editingApresId = null;
+  pendingApresTelas = null;
+  appState.apresDraftNome = null;
   appState.view = view;
   render();
 }
@@ -3897,10 +4129,65 @@ window.addEventListener('message', function(e){
   if(e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
   if(e.data.type === 'funil:navigate') funilNavigate(e.data.view);
 });
-window.addEventListener('hashchange', function(){ funilNavigate((location.hash || '').replace('#','')); });
+window.addEventListener('hashchange', function(){ if(!FUNIL_CALL_MODE) funilNavigate((location.hash || '').replace('#','')); });
+
+/* ---------------- Call em aba própria ----------------
+   /funil-app/?call=<id> abre só o fluxo da call (chat + apresentação), sem o menu.
+   Ao terminar, mostra "Call concluída" e o painel do Dashboard (outra aba) se atualiza. */
+const FUNIL_EMBEDDED = (function(){ try{ return window.top !== window; } catch(e){ return true; } })();
+const FUNIL_CALL_PARAM = (function(){ try{ return new URLSearchParams(location.search).get('call'); } catch(e){ return null; } })();
+const FUNIL_CALL_MODE = !FUNIL_EMBEDDED && !!FUNIL_CALL_PARAM;
+let _funilChannel = null;
+try{ _funilChannel = new BroadcastChannel('funil-de-vendas'); } catch(e){}
+function funilNotifyChange(){
+  try{ if(_funilChannel) _funilChannel.postMessage({type:'changed'}); } catch(e){}
+}
+if(_funilChannel){
+  _funilChannel.onmessage = async function(e){
+    if(!e.data || e.data.type !== 'changed' || FUNIL_CALL_MODE) return;
+    await bootstrapData();
+    if(['dashboard','callsHistory','propostasList','apresentacoesList'].indexOf(appState.view) > -1) render();
+  };
+}
+if(FUNIL_CALL_MODE){
+  document.body.classList.add('funil-call-mode');
+  const _goToDashboard = goToDashboard;
+  goToDashboard = function(){
+    appState.view = 'callDone';
+    render();
+  };
+}
+function renderCallDone(){
+  const call = loadCalls().find(c => c.id === FUNIL_CALL_PARAM);
+  const done = call && call.status === 'concluida';
+  return `
+    <div class="call-done">
+      <h1>${done ? 'Call concluída' : 'Call encerrada'}</h1>
+      <p class="sub">${call ? escapeHtml(call.nomeCliente) + ' · ' + escapeHtml(call.nomeEmpresa) : ''}</p>
+      <p class="sub">${done ? 'Tudo salvo. O painel do Funil de Vendas já foi atualizado.' : 'O que foi feito até aqui está salvo.'}</p>
+      <div class="call-done-actions">
+        <button class="btn-primary" id="callDoneClose">Fechar esta aba</button>
+        <a class="call-done-link" href="/vendas/painel">Ir para o Painel</a>
+      </div>
+    </div>`;
+}
+function attachCallDoneHandlers(){
+  const c = document.getElementById('callDoneClose');
+  if(c) c.onclick = ()=>{ window.close(); setTimeout(()=>{ location.href = '/vendas/painel'; }, 300); };
+}
 
 (async function boot(){
   await bootstrapData();
+  if(FUNIL_CALL_MODE){
+    const call = loadCalls().find(c => c.id === FUNIL_CALL_PARAM);
+    if(call){
+      appState.activeCallId = call.id;
+      appState.view = 'callProfileChoice';
+      document.title = 'Call · ' + (call.nomeEmpresa || call.nomeCliente);
+    } else {
+      appState.view = 'callDone';
+    }
+  }
   const storageWarningSlot = document.getElementById('storageWarningSlot');
   if(storageWarningSlot){ storageWarningSlot.innerHTML = renderStorageWarningBanner(); }
   render();

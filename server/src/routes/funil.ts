@@ -10,12 +10,12 @@ import { requireAuth, requirePasswordChanged } from '../middleware/auth';
  * "Diagnóstico de Crescimento"), agora protegida pelo login único do Dashboard.
  * Os registros são documentos JSON (mesmo formato do protótipo).
  */
-const TABLES = { calls: 'funil_calls', propostas: 'funil_propostas', diagnosticos: 'funil_diagnosticos' } as const;
+const TABLES = { calls: 'funil_calls', propostas: 'funil_propostas', diagnosticos: 'funil_diagnosticos', apresentacoes: 'funil_apresentacoes' } as const;
 type Kind = keyof typeof TABLES;
 const isKind = (k: string): k is Kind => Object.prototype.hasOwnProperty.call(TABLES, k);
 
 /** Limite por requisição: propostas carregam imagens (prints) já comprimidas no navegador. */
-export const FUNIL_BODY_LIMIT = '20mb';
+export const FUNIL_BODY_LIMIT = '30mb';
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const validId = (id: unknown): id is string => typeof id === 'string' && id.length > 0 && id.length <= 120;
@@ -31,9 +31,9 @@ funilApiRouter.use(express.json({ limit: FUNIL_BODY_LIMIT }));
 funilApiRouter.get(
   '/bootstrap',
   asyncHandler(async (req, res) => {
-    const [calls, propostas, diagnosticos] = await Promise.all([list('calls'), list('propostas'), list('diagnosticos')]);
+    const [calls, propostas, diagnosticos, apresentacoes] = await Promise.all([list('calls'), list('propostas'), list('diagnosticos'), list('apresentacoes')]);
     const name = (req.user?.name || req.user?.username || '').trim();
-    res.json({ calls, propostas, diagnosticos, operator: { name: name.split(/\s+/)[0] || name } });
+    res.json({ calls, propostas, diagnosticos, apresentacoes, operator: { name: name.split(/\s+/)[0] || name } });
   }),
 );
 

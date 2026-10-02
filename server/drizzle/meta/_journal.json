@@ -22,6 +22,13 @@
       "when": 1790874565672,
       "tag": "0002_funil_vendas",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790938537344,
+      "tag": "0003_funil_apresentacoes",
+      "breakpoints": true
     }
   ]
 }

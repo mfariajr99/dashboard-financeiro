@@ -169,3 +169,4 @@ const funilDoc = (name: string) =>
 export const funilCalls = funilDoc('funil_calls');
 export const funilPropostas = funilDoc('funil_propostas');
 export const funilDiagnosticos = funilDoc('funil_diagnosticos');
+export const funilApresentacoes = funilDoc('funil_apresentacoes');
