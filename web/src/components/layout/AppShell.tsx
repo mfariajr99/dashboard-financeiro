@@ -1,11 +1,27 @@
 import clsx from 'clsx';
-import { CalendarDays, Flame, Goal, LayoutDashboard, LogOut, Menu, Plus, Receipt, Settings, ShoppingCart, Target, Wallet, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, FilePlus2, FileSearch, Flame, Headset, History, Presentation, type LucideIcon, Goal, LayoutDashboard, LogOut, Menu, Plus, Receipt, Settings, ShoppingCart, Target, Wallet, X } from 'lucide-react';
 import { Brand } from './Brand';
-import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
-import { IconButton } from '../ui/primitives';
+import { IconButton, Skeleton } from '../ui/primitives';
 import { useQuickActions } from './QuickActions';
+
+/* ------------------------------------------------ Funil de Vendas: telas */
+
+/** Telas do Funil de Vendas (app do diagnóstico) acessíveis pelo menu do Dashboard. */
+export const FUNIL_VIEWS: { slug: string; view: string; label: string; icon: LucideIcon }[] = [
+  { slug: 'painel', view: 'dashboard', label: 'Painel', icon: LayoutDashboard },
+  { slug: 'criar-call', view: 'callForm', label: 'Criar Call', icon: Headset },
+  { slug: 'historico', view: 'callsHistory', label: 'Histórico de Calls', icon: History },
+  { slug: 'criar-proposta', view: 'propostaForm', label: 'Criar Proposta', icon: FilePlus2 },
+  { slug: 'propostas', view: 'propostasList', label: 'Consultar Propostas', icon: FileSearch },
+];
+
+export const FUNIL_BASE = '/vendas';
+export const viewForSlug = (slug?: string) => FUNIL_VIEWS.find((v) => v.slug === slug) ?? FUNIL_VIEWS[0];
+export const slugForView = (view: string) => FUNIL_VIEWS.find((v) => v.view === view)?.slug ?? null;
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -18,29 +34,82 @@ const NAV = [
 ];
 const BOTTOM = [NAV[0], NAV[1], NAV[2], NAV[3]];
 
+const linkClass = (isActive: boolean) =>
+  clsx(
+    'focus-ring flex h-11 items-center gap-3 rounded-field px-3 text-[13.5px] font-medium transition-colors',
+    isActive ? 'bg-primary-soft text-white ring-1 ring-inset ring-primary/40' : 'text-ink-muted hover:bg-elevated hover:text-white',
+  );
+
+function NavItem({ to, label, icon: Icon, end, onNavigate }: (typeof NAV)[number] & { onNavigate?: () => void }) {
+  return (
+    <NavLink to={to} end={end} onClick={onNavigate} className={({ isActive }) => linkClass(isActive)}>
+      {({ isActive }) => (
+        <>
+          <Icon className={clsx('h-[19px] w-[19px]', isActive ? 'text-accent' : '')} strokeWidth={1.9} />
+          {label}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+/** Categoria "Funil de Vendas" (app do diagnóstico) com as telas como subitens. */
+function FunilGroup({ onNavigate }: { onNavigate?: () => void }) {
+  const loc = useLocation();
+  const inside = loc.pathname === FUNIL_BASE || loc.pathname.startsWith(`${FUNIL_BASE}/`);
+  const [open, setOpen] = useState(inside);
+  useEffect(() => {
+    if (inside) setOpen(true);
+  }, [inside]);
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="nav-funil-vendas"
+        onClick={() => setOpen((v) => !v)}
+        className={clsx(linkClass(false), 'w-full', inside && 'text-white')}
+      >
+        <Presentation className={clsx('h-[19px] w-[19px]', inside && 'text-accent')} strokeWidth={1.9} />
+        <span className="flex-1 text-left">Funil de Vendas</span>
+        <ChevronDown className={clsx('h-4 w-4 transition-transform', open && 'rotate-180')} aria-hidden />
+      </button>
+      {open && (
+        <div id="nav-funil-vendas" className="ml-[22px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2.5">
+          {FUNIL_VIEWS.map(({ slug, label, icon: Icon }) => (
+            <NavLink
+              key={slug}
+              to={`${FUNIL_BASE}/${slug}`}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                clsx(
+                  'focus-ring flex h-9 items-center gap-2.5 whitespace-nowrap rounded-field px-2.5 text-[12.5px] font-medium transition-colors',
+                  isActive ? 'bg-primary-soft text-white' : 'text-ink-muted hover:bg-elevated hover:text-white',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className={clsx('h-4 w-4', isActive && 'text-accent')} strokeWidth={1.9} aria-hidden />
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1" aria-label="Menu principal">
-      {NAV.map(({ to, label, icon: Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            clsx(
-              'focus-ring flex h-11 items-center gap-3 rounded-field px-3 text-[13.5px] font-medium transition-colors',
-              isActive ? 'bg-primary-soft text-white ring-1 ring-inset ring-primary/40' : 'text-ink-muted hover:bg-elevated hover:text-white',
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <Icon className={clsx('h-[19px] w-[19px]', isActive ? 'text-accent' : '')} strokeWidth={1.9} />
-              {label}
-            </>
-          )}
-        </NavLink>
+      {NAV.map((item) => (
+        <div key={item.to} className="contents">
+          <NavItem {...item} onNavigate={onNavigate} />
+          {item.to === '/funil' && <FunilGroup onNavigate={onNavigate} />}
+        </div>
       ))}
     </nav>
   );
@@ -195,5 +264,123 @@ function BottomLink({ to, label, icon: Icon, end }: (typeof NAV)[number]) {
       <Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
       <span className="truncate">{label.split(' ')[0]}</span>
     </NavLink>
+  );
+}
+
+/* ------------------------------------------------ Funil de Vendas: página */
+
+/**
+ * Funil de Vendas: o app do diagnóstico (calls, propostas, diagnóstico, apresentação e PDFs)
+ * roda dentro do Dashboard, na mesma origem e com a mesma sessão (login único).
+ * O menu do Dashboard troca de tela por postMessage; o app avisa em qual tela está.
+ */
+const isDemo = () => typeof window !== 'undefined' && !!(window as unknown as { __FINPLAN_DEMO__?: boolean }).__FINPLAN_DEMO__;
+
+export function FunilVendasPage() {
+  if (isDemo())
+    return (
+      <div className="card p-6">
+        <h1 className="section-title">Funil de Vendas</h1>
+        <p className="label mt-2">O Funil de Vendas (calls, propostas, diagnóstico e PDFs) usa o servidor e o banco de dados — ele abre na versão online do Dashboard.</p>
+      </div>
+    );
+  return <FunilVendasFrame />;
+}
+
+function FunilVendasFrame() {
+  const { slug } = useParams();
+  const target = viewForSlug(slug);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { logout } = useAuth();
+  const frame = useRef<HTMLIFrameElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [src] = useState(() => `/funil-app/#${target.view}`);
+  const [loaded, setLoaded] = useState(false);
+  const [current, setCurrent] = useState(target.view);
+  const [height, setHeight] = useState<number | null>(null);
+
+  // Ocupa a altura disponível da tela (o app rola por dentro).
+  const measure = useCallback(() => {
+    const el = box.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY;
+    const bottomGap = window.innerWidth >= 1024 ? 16 : 84; // lg: sem barra inferior
+    const vh = window.visualViewport?.height ?? window.innerHeight;
+    setHeight(Math.max(420, Math.round(vh - top - bottomGap)));
+  }, []);
+  useLayoutEffect(() => {
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, [measure]);
+
+  // Menu → app
+  useEffect(() => {
+    if (!loaded || current === target.view) return;
+    frame.current?.contentWindow?.postMessage({ type: 'funil:navigate', view: target.view }, window.location.origin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.view, loaded]);
+
+  // App → menu
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
+      const d = e.data as { type?: string; view?: string };
+      if (d?.type === 'funil:view' && typeof d.view === 'string') {
+        setCurrent(d.view);
+        const s = slugForView(d.view);
+        if (s && s !== slug) navigate(`${FUNIL_BASE}/${s}`, { replace: true });
+      } else if (d?.type === 'funil:logout') void logout();
+      else if (d?.type === 'funil:session-expired') void qc.invalidateQueries({ queryKey: ['me'] });
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [slug, navigate, logout, qc]);
+
+  return (
+    <div className="-mx-4 -mt-4 sm:-mx-6 lg:-mx-8 lg:-mt-6">
+      {/* Abas (no celular o menu lateral fica no ☰) */}
+      <nav aria-label="Funil de Vendas" className="flex gap-1.5 overflow-x-auto border-b border-line bg-bg px-4 py-2 sm:px-6 lg:hidden">
+        {FUNIL_VIEWS.map(({ slug: s, label, icon: Icon }) => (
+          <NavLink
+            key={s}
+            to={`${FUNIL_BASE}/${s}`}
+            className={({ isActive }) =>
+              clsx(
+                'focus-ring flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium',
+                isActive ? 'border-primary/50 bg-primary-soft text-white' : 'border-line text-ink-muted',
+              )
+            }
+          >
+            <Icon className="h-4 w-4" aria-hidden /> {label}
+          </NavLink>
+        ))}
+      </nav>
+      <div ref={box} className="relative" style={{ height: height ?? '75dvh' }}>
+        {!loaded && (
+          <div className="absolute inset-0 space-y-4 p-6" aria-hidden>
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-64" />
+          </div>
+        )}
+        <iframe
+          ref={frame}
+          src={src}
+          title="Funil de Vendas"
+          onLoad={() => {
+            setLoaded(true);
+            measure();
+          }}
+          className={clsx('block h-full w-full border-0 bg-bg', !loaded && 'opacity-0')}
+          allow="clipboard-write"
+        />
+      </div>
+    </div>
   );
 }
